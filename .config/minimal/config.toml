@@ -1,0 +1,15 @@
+[loadouts]
+# Applied to every `min activate` that doesn't pass --loadout/--no-loadouts.
+#
+# ORDER MATTERS: hooks concatenate in this order, and the sandbox-dashboard
+# loadout's on_activate must start its :4320 listener before dev's tailnet
+# hook runs `tailscale serve` over that port.
+#
+# agent-claude supplies the coding agent (claude-code package + DEV_AGENT_CMD
+# for dev's zellij layout). To try Pi instead, swap it for agent-pi — either
+# here or one-off via flags, which ignore this list entirely:
+#     min activate --loadout sandbox-dashboard --loadout dev --loadout agent-pi
+# (agent-claude and agent-pi both set DEV_AGENT_CMD, so applying both is an
+# activation-failing var conflict by design.)
+default_loadouts = ["sandbox-dashboard", "dev", "agent-claude"]
+follow_symlinks  = false

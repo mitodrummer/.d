@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# Per-developer session hook for kg's `dev` loadout.
+#
+# Invoked by the loadout's own PROMPT_COMMAND (see dev.toml [vars]) at the
+# first interactive prompt of the attach shell — after the PROJECT side is up
+# (min ≥ 0.5.2 runs a project's on_activate hooks natively; webapp's runs
+# scripts/setup-dev.sh). Everything here is a personal preference that no repo
+# should have to carry: git credential wiring, tailnet exposure, and the
+# zellij layout (whose agent pane comes from $DEV_AGENT_CMD, set by the
+# applied agent loadout — agent-claude, agent-pi, ...).
+#
+# Patched into the session by dev.toml as ~/.local/bin/minimal-session-hook.
+# It runs at attach, not from a lifecycle hook, because the gh device-code
+# login and the foreground zellij need the attach TTY — hooks have none
+# (on_activate) or a 300s cap (on_attach) that would kill the multiplexer.
+#
+# Deliberately NOT `set -e`: this runs at the end of session setup, and a
+# failure in any personal nicety must leave the developer in a working sandbox
+# rather than killing the attach. Each step soft-fails on its own.
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --------------------------------------------------------------------------
+# git: the sandbox has no SSH keys (~/.ssh is read-only), so rewrite an SSH
+# origin to HTTPS and wire `gh` as the credential helper. Lets git pull/push in
+# the shell pane piggy-back on the existing `gh auth login` session.
+#
+# This is personal, not project policy: a contributor using agent-forwarding
+# would not want their remote rewritten, which is why it moved out of webapp.
+# --------------------------------------------------------------------------
+if command -v gh >/dev/null 2>&1; then
+  # Log in FIRST — `gh auth setup-git` only writes a credential helper for hosts
+  # gh is already authenticated against, so running it first (as this used to)
+  # just warns and leaves git unable to push. Nothing is persisted between
+  # sessions, so this is a fresh login every time.
+  #
+  # `gh auth login` is interactive. That is workable here because the hook runs
+  # from PROMPT_COMMAND in the attached shell, before zellij takes the terminal,
+  # so stdin is a TTY and the device-code prompt is answerable. The `-t 0` guard
+  # keeps a non-interactive invocation (a detached activate, a CI-ish run) from
+  # blocking forever on a prompt nobody can see — it degrades to a printed
+  # instruction instead.
+  if gh auth status >/dev/null 2>&1; then
+    : # already authenticated (re-attach within the same session)
+  elif [ -t 0 ]; then
+    echo "GitHub: not authenticated in this session — starting 'gh auth login'." >&2
+    gh auth login ||
+      echo "Warning: 'gh auth login' did not complete; run it by hand." >&2
+  else
+    echo "GitHub: not authenticated and no TTY; run 'gh auth login' in the shell pane." >&2
+  fi
+
+  gh auth setup-git 2>/dev/null ||
+    echo "Warning: 'gh auth setup-git' failed; run 'gh auth login'." >&2
+else
+  echo "Warning: GitHub CLI ('gh') not installed; git pull/push may fail." >&2
+fi
+
+# Rewrite an SSH origin to HTTPS so the credential helper wired above is the one
+# git actually uses. After the gh block, so a failed login doesn't leave the
+# remote rewritten with no way to authenticate against it.
+origin_url="$(git remote get-url origin 2>/dev/null || true)"
+if printf '%s\n' "$origin_url" | grep -q '^git@github.com:'; then
+  git remote set-url origin \
+    "$(printf '%s\n' "$origin_url" | sed 's|git@github.com:|https://github.com/|')"
+fi
+
+# --------------------------------------------------------------------------
+# Discovery dashboard on :4320 — lists every running dev server across the
+# worktree set. Owned by the sandbox-dashboard loadout (whose on_activate
+# normally starts it); this re-run is the `--no-hooks` / re-attach fallback,
+# idempotent via dashboard.sh's pidfile check. The guard makes it a no-op
+# when that loadout isn't applied.
+#
+# MUST come before the tailnet step: sandbox-tailnet-up.sh serves a fixed
+# SERVE_PORTS=(4320 4321), and a port with nothing listening behind it still
+# gets mapped — so http://sandbox:4320 resolves but errors. Starting the
+# dashboard first means the listener exists when `tailscale serve` maps it.
+# --------------------------------------------------------------------------
+if [ -f "$HOME/.local/lib/sandbox-dashboard/dashboard.sh" ]; then
+  bash "$HOME/.local/lib/sandbox-dashboard/dashboard.sh" start || true
+fi
+
+# --------------------------------------------------------------------------
+# Tailnet: join and expose the dev servers by name (http://sandbox:<port>).
+# No-ops without TS_AUTHKEY, so this is inert unless the key is inherited in.
+# Normally already done by the loadout's on_activate hook — `up` is idempotent
+# — but kept here so a `--no-hooks` session still gets the tailnet at attach.
+# --------------------------------------------------------------------------
+# `-f` not `-x`: patched-in files land without the executable bit (modes are
+# normalized on the way into the session), which is also why this runs through
+# `bash` rather than executing the script directly.
+if [ -f "$HOOK_DIR/sandbox-tailnet-up.sh" ]; then
+  bash "$HOOK_DIR/sandbox-tailnet-up.sh" || true
+fi
+
+# Interactive `tailscale` wrapper. tailscaled runs in userspace-networking mode
+# on a non-default socket (the sandbox is unprivileged), so a bare
+# `tailscale status` always fails with "it doesn't appear to be running" —
+# whether or not it is. Point the CLI at the right socket so the command in the
+# docs, and in muscle memory, does what it says.
+#
+# Written to ~/.bashrc because scripts/dev-bashrc.sh (the rcfile the zellij
+# panes source) sources ~/.bashrc, so every pane inherits it. Guarded by a
+# marker so re-attaching doesn't append it repeatedly.
+if ! grep -q 'minimal-session-hook: tailscale socket' "$HOME/.bashrc" 2>/dev/null; then
+  cat >>"$HOME/.bashrc" <<'BASHRC'
+
+# minimal-session-hook: tailscale socket wrapper (userspace tailscaled)
+tailscale() { command tailscale --socket=/tmp/ts/tailscaled.sock "$@"; }
+BASHRC
+fi
+
+# --------------------------------------------------------------------------
+# zellij: seed a config so the FIRST-RUN SETUP WIZARD never appears. The wizard
+# is triggered by the ABSENCE of a config file — there is no `zellij options`
+# flag for it (checked against 0.44) — and a v0.5 session gets a fresh $HOME on
+# its own subvolume every time, so without this it greets every `min activate`
+# and lands on top of the layout.
+#
+# Generated from `zellij setup --dump-config` rather than pinned here: the
+# output is by definition valid for whatever zellij the session actually has,
+# so a catalog version bump can't leave a stale config behind. Only written
+# when missing, so hand edits survive re-attaches.
+# --------------------------------------------------------------------------
+command -v zellij >/dev/null 2>&1 || {
+  echo "zellij not installed; skipping layout." >&2
+  exit 0
+}
+
+zj_config="${XDG_CONFIG_HOME:-$HOME/.config}/zellij/config.kdl"
+if [ ! -f "$zj_config" ]; then
+  mkdir -p "$(dirname "$zj_config")"
+  zellij setup --dump-config >"$zj_config" 2>/dev/null || rm -f "$zj_config"
+fi
+
+# A prior `dev` session is deliberately NOT force-deleted. The sandbox outlives
+# each `min attach`, and this hook re-runs on a second attach — tearing the
+# layout down would kill panes still being worked in. `attach --create` rejoins
+# a live session and creates one when there is none. For a clean layout, run
+# `zellij delete-session --force dev` by hand first.
+#
+# The shell pane sources the repo's welcome-banner rcfile directly — webapp
+# stopped exporting $MINIMAL_BASHRC when setup moved to native lifecycle hooks
+# (its scripts/dev-bashrc.sh header now names the loadout as the thing that
+# points panes at it). Falling back to ~/.bashrc keeps the layout usable in a
+# project that ships no such rcfile; dev-bashrc.sh sources ~/.bashrc itself,
+# so nothing is lost by preferring it.
+rcfile="$HOME/.bashrc"
+[ -f scripts/dev-bashrc.sh ] && rcfile="$PWD/scripts/dev-bashrc.sh"
+
+# The agent pane runs $DEV_AGENT_CMD, contributed by whichever agent loadout
+# is applied (agent-claude, agent-pi, ...). Split on whitespace into argv —
+# no agent invocation carries a space-containing argument — and the pane is
+# named after the binary so the layout shows which agent this session runs.
+# Without DEV_AGENT_CMD (no agent loadout, or `--no-loadouts` debugging) the
+# layout degrades to the shell pane alone.
+agent_pane=""
+if [ -n "${DEV_AGENT_CMD:-}" ]; then
+  read -ra agent_argv <<<"$DEV_AGENT_CMD"
+  agent_args=""
+  for tok in "${agent_argv[@]:1}"; do
+    agent_args+=" \"$tok\""
+  done
+  agent_pane=$(printf 'pane focus=true name="%s" command="%s"' "${agent_argv[0]}" "${agent_argv[0]}")
+  if [ -n "$agent_args" ]; then
+    agent_pane=$(printf '%s {\n            args%s\n        }' "$agent_pane" "$agent_args")
+  fi
+fi
+
+if [ -n "$agent_pane" ]; then
+  layout_str=$(cat <<EOF
+layout {
+    pane split_direction="vertical" {
+        $agent_pane
+        pane name="shell" command="bash" {
+            args "--rcfile" "$rcfile" "-i"
+        }
+    }
+}
+EOF
+)
+else
+  layout_str=$(cat <<EOF
+layout {
+    pane name="shell" command="bash" {
+        args "--rcfile" "$rcfile" "-i"
+    }
+}
+EOF
+)
+fi
+
+# `options` is a subcommand of `attach` (not a top-level flag), so it trails the
+# session name. Both popups default to on and both land on top of the layout:
+#   --show-startup-tips   the tips panel, shown on every NEW session
+#   --show-release-notes  shown once per zellij version bump — rare, but it
+#                         surfaces right after an upgrade, which is exactly
+#                         when a session is being demoed or recorded
+zellij --layout-string "$layout_str" attach --create dev \
+  options --show-startup-tips false --show-release-notes false

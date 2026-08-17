@@ -1,0 +1,107 @@
+name        = "dev"
+description = "kg: zellij + vim with host dotfiles, tailnet on_activate + zellij via PROMPT_COMMAND (agent-agnostic)"
+
+# Personal tooling only, and AGENT-AGNOSTIC: which coding agent runs in the
+# zellij layout is contributed by a sibling agent loadout (agent-claude or
+# agent-pi) through the DEV_AGENT_CMD var — this loadout carries everything
+# that stays the same regardless of agent. Anything a project NEEDS to run
+# belongs in that project's `[session]` block, so `min activate --no-loadouts`
+# still yields a working checkout. The sandbox dashboard is a third sibling
+# (sandbox-dashboard.toml). See dev.d/minimal-session-hook.
+#
+# tailscale: dev.d/sandbox-tailnet-up.sh runs tailscaled in userspace-networking
+# mode (the sandbox is unprivileged, with no /dev/net/tun) to expose the dev
+# servers as http://sandbox:<port>. It moved here from webapp's [session] block
+# along with the script — exposing a sandbox on a personal tailnet is a
+# developer choice, not something the project should impose. Declared rather
+# than left to the script's `min add tailscale` fallback, so it is fetched with
+# the rest of the session instead of installed on first run.
+packages = ["vim", "zellij", "fzf", "tailscale"]
+
+# Patches are one-way host -> session copies: the session cannot write back, so
+# host config can't be corrupted from inside the sandbox.
+#
+# NOTE ON CREDENTIALS: patching credential FILES copies stale artifacts on this
+# host — gh keeps its token in the macOS Keychain and hosts.yml holds no
+# credential, so a patched ~/.config/gh would carry an account name and no
+# working login. The environment is the only channel that carries a live one —
+# see GH_TOKEN below. (Claude Code has the same story; its loadout,
+# agent-claude.toml, documents it there.)
+patches = [
+    { dest = ".gitconfig", source = "~/.gitconfig" },
+    { dest = ".vimrc", source = "~/.vimrc" },
+    { dest = ".config/zellij", source = "~/.config/zellij" },
+
+    # gcloud Application Default Credentials. UNLIKE gh and claude, this one is
+    # a real file rather than a Keychain leftover: `gcloud auth
+    # application-default login` writes it, and it holds a refresh token that
+    # persists until revoked rather than expiring on a short cycle. So the
+    # file-patch pattern that fails for those two is exactly right here.
+    #
+    # Patched to the same path the session would look in anyway, so ADC is
+    # found with no GOOGLE_APPLICATION_CREDENTIALS needed — which is what
+    # scripts/vulndb-proxy.sh (cloud-sql-proxy) consumes.
+    #
+    # Only ADC: credentials.db / access_tokens.db (what the `gcloud` CLI itself
+    # authenticates from) are deliberately left out. The proxy needs ADC, not a
+    # logged-in CLI, so copying them would widen exposure for nothing. Add them
+    # if you actually want to run `gcloud` commands in-session.
+    { dest = ".config/gcloud/application_default_credentials.json", source = "~/.config/gcloud/application_default_credentials.json" },
+
+    # The session hook + its helper scripts, packaged alongside this loadout
+    # and patched to ~/.local/bin/ so they execute in-session as REAL FILES.
+    # That matters: an external lifecycle hook is piped to its interpreter on
+    # stdin, which breaks the hook's BASH_SOURCE-relative helper resolution —
+    # so the on_activate hook and PROMPT_COMMAND below both invoke these
+    # patched copies instead of shipping the script as `type = "external"`.
+    # (External paths also anchor to a sibling dir NAMED AFTER the loadout —
+    # dev/, not dev.d/ — which is what broke activation when min 0.5.2 started
+    # executing hooks natively.)
+    { dest = ".local/bin/minimal-session-hook", source = "~/.config/minimal/loadouts/dev.d/minimal-session-hook" },
+    { dest = ".local/bin/", source = "~/.config/minimal/loadouts/dev.d/*.sh" },
+]
+
+# Non-interactive personal setup only. The interactive layer (gh device-code
+# login, the foreground zellij takeover) CANNOT live in a lifecycle hook:
+# on_activate has no terminal and a failing on_activate fails the whole
+# activation, while on_attach caps scripts at 300s — which would kill a
+# foreground multiplexer under the developer. That layer runs from
+# PROMPT_COMMAND (see [vars]). Ordering is right by construction: project
+# hooks run before loadout hooks, so webapp's setup-dev.sh has already started
+# the dev servers, and the sandbox-dashboard loadout (listed before this one
+# in default_loadouts) has started the :4320 dashboard that `tailscale serve`
+# maps alongside them.
+# `|| true`: tailnet exposure is a nicety; it must never fail activation.
+# timeout: the script's internal waits are all bounded (daemon poll 10s +
+# `up` 30s + 2×20s serve) — 120 covers the worst case with slack, where the
+# 60s default would not. A runtime-killed on_activate fails the activation,
+# which the inner `|| true` cannot absorb.
+[[lifecycle_hooks]]
+description = "Join tailnet and expose dev servers by name (no-op without TS_AUTHKEY)"
+on_activate = { type = "inline", value = "bash ~/.local/bin/sandbox-tailnet-up.sh up || true", timeout = 120 }
+
+[vars]
+# webapp's PROMPT_COMMAND seam is gone as of gominimal/webapp#606 (project
+# setup now runs natively from its [[session.lifecycle_hooks]] on min 0.5.2),
+# so no other contributor sets this var and the old hard-conflict reason for
+# not owning it here is gone. First interactive prompt of the attach shell —
+# the one place with a real TTY — runs the personal hook: gh login, zellij
+# layout. Self-unsetting so it fires once per attach shell; the guard keeps
+# the panes zellij spawns (which inherit the var) from re-running it. This
+# also survives `--no-hooks`, since vars are not hooks.
+PROMPT_COMMAND = 'unset PROMPT_COMMAND; [ -z "${ZELLIJ:-}${TMUX:-}${STY:-}" ] && bash "$HOME/.local/bin/minimal-session-hook"'
+# gh's token lives in the macOS Keychain, not in ~/.config/gh/hosts.yml, so
+# patching that directory copies an account name and no credential — gh in the
+# session would still be logged out. The environment is the only channel that
+# carries it. With this set, `gh auth status` succeeds immediately and the
+# hook's interactive `gh auth login` short-circuits.
+#
+# Requires the host to export it, e.g. in ~/.zshrc:
+#     export GH_TOKEN="$(gh auth token)"
+# Unset on the host, `inherit` contributes nothing and the hook falls back to an
+# interactive login, so this degrades rather than breaks.
+GH_TOKEN  = { inherit = true }
+EDITOR    = "vim"
+VISUAL    = "vim"
+TERM      = { inherit = true, default = "xterm-256color" }
+COLORTERM = { inherit = true }

@@ -1,0 +1,26 @@
+name        = "agent-pi"
+description = "kg: Pi (pi.dev) as the session's coding agent, instead of Claude Code"
+
+# Alternative agent loadout for trying the Pi coding agent. Mutually exclusive
+# with agent-claude by construction: both set DEV_AGENT_CMD, and a var set by
+# two loadouts is an activation-failing conflict. Apply with e.g.
+#     min activate --loadout sandbox-dashboard --loadout dev --loadout agent-pi
+# (`--loadout` ignores default_loadouts, so this swaps cleanly).
+#
+# `pi` is the catalog package for @earendil-works/pi-coding-agent (installed
+# from the sha256-pinned npm registry tarball; run `min update` if the
+# activation reports an unknown package).
+packages = ["pi"]
+
+[vars]
+# Consumed by the dev loadout's minimal-session-hook: the zellij layout's
+# agent pane runs this command.
+DEV_AGENT_CMD = "pi"
+
+# Pi authenticates against model providers via API keys from the environment.
+# Inherit-with-no-default contributes nothing when unset on the host, so each
+# of these degrades to Pi's own auth prompts. Export on the host to pre-wire:
+#     export ANTHROPIC_API_KEY=...    # ~/.zshrc
+ANTHROPIC_API_KEY = { inherit = true }
+OPENAI_API_KEY = { inherit = true }
+GEMINI_API_KEY = { inherit = true }

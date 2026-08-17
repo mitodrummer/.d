@@ -1,0 +1,41 @@
+name        = "sandbox-dashboard"
+description = "kg: in-sandbox discovery dashboard on :4320 (worktree dev servers, shares, assigned issues)"
+
+# The dashboard code lives in sandbox-dashboard.d/ (extracted from
+# gominimal/webapp — see sandbox-dashboard.d/README.md). This loadout patches
+# the runtime files into the session and starts the server; the project side
+# only has to honor the discovery contract (pidfiles + /healthcheck), which the
+# webapp's scripts/dev.sh already does.
+#
+# ORDERING: list this loadout BEFORE `dev` (see default_loadouts in
+# ../config.toml). Hooks concatenate in loadout order, and dev's tailnet hook
+# runs `tailscale serve` over a fixed port list that includes :4320 — the
+# dashboard listener must exist by then so the mapped port isn't a dead serve.
+# Project hooks run before all loadout hooks, so the webapp's setup-dev.sh has
+# already started the dev servers this dashboard discovers.
+
+# node-lts runs the TS server (node ≥22.18 strips types natively); git + gh
+# feed worktree/PR/issue discovery; cloudflared backs the opt-in public Share
+# action (the dashboard degrades to a hint when it's absent, but a loadout
+# that ships the Share button should ship its binary too). All four dedupe
+# against whatever the project session already provides.
+packages = ["node-lts", "git", "gh", "cloudflared"]
+
+# One dest per file, not a glob or source list: sandbox-dashboard.d/ also
+# carries tests, package.json, and node_modules that must never be patched
+# into a session, and multiple sources aimed at one dest directory are a
+# same-dest merge conflict at composition time.
+patches = [
+    { dest = ".local/lib/sandbox-dashboard/dashboard.sh", source = "~/.config/minimal/loadouts/sandbox-dashboard.d/dashboard.sh" },
+    { dest = ".local/lib/sandbox-dashboard/sandbox-dashboard.ts", source = "~/.config/minimal/loadouts/sandbox-dashboard.d/sandbox-dashboard.ts" },
+    { dest = ".local/lib/sandbox-dashboard/discover.ts", source = "~/.config/minimal/loadouts/sandbox-dashboard.d/discover.ts" },
+    { dest = ".local/lib/sandbox-dashboard/tunnels.ts", source = "~/.config/minimal/loadouts/sandbox-dashboard.d/tunnels.ts" },
+]
+
+# Runs with cwd = project root, which is the discovery anchor (git worktree
+# list, pidfile cwd matching, .tailscale/node-name). `|| true`: the dashboard
+# is a nicety and must never fail activation. Invoked through `bash` because
+# patched-in files land without the executable bit.
+[[lifecycle_hooks]]
+description = "Start the sandbox discovery dashboard on :4320"
+on_activate = { type = "inline", value = "bash ~/.local/lib/sandbox-dashboard/dashboard.sh start || true" }

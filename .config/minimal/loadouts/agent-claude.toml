@@ -1,0 +1,56 @@
+name        = "agent-claude"
+description = "kg: Claude Code as the session's coding agent (package, prefs, skills, onboarding seed)"
+
+# One agent loadout at a time: this and agent-pi both set DEV_AGENT_CMD, so
+# applying both fails activation with a var conflict — the failure mode we
+# want. Swap agents by swapping which loadout is applied (see default_loadouts
+# in ../config.toml, or `min activate --loadout ...`).
+packages = ["claude-code"]
+
+# ~/.claude, narrowed. The whole directory is 42MB and most of it either
+# breaks or is meaningless in a session:
+#   plugins/  (9.6M) installed_plugins.json + known_marketplaces.json embed
+#             absolute host paths (/Users/kg/.claude/plugins/...,
+#             /Users/kg/workspace/minimal/webapp). HOME is /home and the
+#             repo is /workbench in-session, so those entries dangle.
+#   projects/ (29M)  per-repo history keyed by absolute host path.
+#   cache/, paste-cache/, tasks/, session-env/  host-local runtime state.
+#   .credentials.json  a stale Keychain leftover (macOS keeps the live token
+#             in the Keychain; the on-disk file stopped being refreshed).
+# What is left is path-free and worth having: preferences and the personal
+# skills (grill-me, ralph-loop-*, … — the ones that used to live in the webapp
+# repo's .claude/skills/ but are developer-generic, not project convention).
+patches = [
+    { dest = ".claude/settings.json", source = "~/.claude/settings.json" },
+    { dest = ".claude/settings.local.json", source = "~/.claude/settings.local.json" },
+    { dest = ".claude/skills/", source = "~/.claude/skills/**/*" },
+]
+
+# First-run state: a valid CLAUDE_CODE_OAUTH_TOKEN in the environment is NOT
+# sufficient on its own — Claude Code gates on ~/.claude.json, and a fresh
+# session HOME has none, so it would run onboarding and prompt to log in even
+# with the token present. Seeded here (no TTY needed) rather than patched from
+# the host, whose 75KB .claude.json is mostly host-coupled state keyed by
+# absolute paths. Written only when absent, so anything Claude writes later
+# survives re-attach.
+[[lifecycle_hooks]]
+description = "Seed ~/.claude.json so Claude Code skips first-run onboarding"
+on_activate = { type = "inline", value = '''[ -f "$HOME/.claude.json" ] || printf '%s\n' '{' '  "hasCompletedOnboarding": true,' '  "lastOnboardingVersion": "2.1.105"' '}' > "$HOME/.claude.json"''' }
+
+[vars]
+# Consumed by the dev loadout's minimal-session-hook: the zellij layout's agent
+# pane runs this command (split on whitespace into argv). Unset — e.g. no
+# agent loadout applied — the layout degrades to a shell-only pane.
+DEV_AGENT_CMD = "claude --remote-control webapp --allow-dangerously-skip-permissions --model claude-fable-5"
+
+# The on-disk ~/.claude/.credentials.json the patches above deliberately skip
+# is a stale Keychain leftover, so the token has to come through the
+# environment (same pattern as GH_TOKEN in the dev loadout). Mint a long-lived
+# one on the host (it does not expire the way the cached OAuth token does) and
+# export it:
+#     claude setup-token
+#     export CLAUDE_CODE_OAUTH_TOKEN="<token>"    # ~/.zshrc
+# Unset, this contributes nothing and Claude prompts for login in-session.
+#CLAUDE_CODE_OAUTH_TOKEN = { inherit = true }
+CLAUDE_CODE_SUBSCRIPTION_TYPE = "max"
+CLAUDE_CODE_RATE_LIMIT_TIER = "default_claude_max_20x"
