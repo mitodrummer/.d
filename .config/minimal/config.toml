@@ -1,5 +1,5 @@
 [loadouts]
-# Applied to every `min activate` that doesn't pass --loadout/--no-loadouts.
+# Applied to every `min session activate` that doesn't pass --loadout/--no-loadouts.
 #
 # Order is not load-bearing: tailnet-dashboard bundles the tailnet join with
 # the dashboard, whose reconcile loop issues the `tailscale serve` mappings
@@ -8,7 +8,7 @@
 # agent-claude supplies the coding agent (claude-code package + DEV_AGENT_CMD
 # for dev's zellij layout). To try Pi instead, swap it for agent-pi — either
 # here or one-off via flags, which ignore this list entirely:
-#     min activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
+#     min session activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
 # (agent-claude and agent-pi both set DEV_AGENT_CMD, so applying both is an
 # activation-failing var conflict by design.)
 default_loadouts = ["tailnet-dashboard", "dev", "agent-claude"]

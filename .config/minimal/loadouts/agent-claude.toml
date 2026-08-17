@@ -4,7 +4,7 @@ description = "kg: Claude Code as the session's coding agent (package, prefs, sk
 # One agent loadout at a time: this and agent-pi both set DEV_AGENT_CMD, so
 # applying both fails activation with a var conflict — the failure mode we
 # want. Swap agents by swapping which loadout is applied (see default_loadouts
-# in ../config.toml, or `min activate --loadout ...`).
+# in ../config.toml, or `min session activate --loadout ...`).
 packages = ["claude-code"]
 
 # ~/.claude, narrowed. The whole directory is 42MB and most of it either

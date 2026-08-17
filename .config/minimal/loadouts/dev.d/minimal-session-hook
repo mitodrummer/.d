@@ -115,7 +115,7 @@ fi
 # zellij: seed a config so the FIRST-RUN SETUP WIZARD never appears. The wizard
 # is triggered by the ABSENCE of a config file — there is no `zellij options`
 # flag for it (checked against 0.44) — and a v0.5 session gets a fresh $HOME on
-# its own subvolume every time, so without this it greets every `min activate`
+# its own subvolume every time, so without this it greets every `min session activate`
 # and lands on top of the layout.
 #
 # Generated from `zellij setup --dump-config` rather than pinned here: the

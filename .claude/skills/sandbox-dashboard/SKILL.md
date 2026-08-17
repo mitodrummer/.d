@@ -65,6 +65,47 @@ is discovery-only — it never proxies or rewrites URLs, because dev servers'
 absolute asset paths, HMR WebSockets, and view transitions all break under a
 path prefix.
 
+## Tailnet setup and reachability
+
+The loadout's `sandbox-tailnet-up.sh` joins the sandbox as a **userspace**
+Tailscale node named `sandbox` (unprivileged: no `/dev/net/tun`, so
+web-serve only — **there is no SSH into the sandbox**, Tailscale SSH needs
+root). Auth is `TS_AUTHKEY` (env, or the project's `.env.local`); prefer an
+OAuth client secret (`tskey-client-…`, scope `auth_keys`, tag `tag:sandbox`)
+— never expires, mints a fresh ephemeral key per join so dead nodes
+self-deregister. The node's statedir is `<repo-root>/.tailscale` (scratch;
+gitignored — it holds the node key). Ports are served over **HTTP**, not
+https (the cert feature hangs). Full mechanics in the script header.
+
+One-time Mac-side setup so names resolve: Tailscale app → "Use Tailscale
+DNS" ON; admin console → DNS → MagicDNS on, no unreachable global
+nameserver (a dead one breaks all resolution).
+
+Two ways to reach a dev server:
+
+1. **Tailnet, anywhere** — `http://sandbox:<port>`. Works from any tailnet
+   device, but relay-bound (DERP), so slower for chatty dev traffic (HMR,
+   large bundles).
+2. **Direct, fast, same network** — `http://<vm-ip>:<port>` (the sandbox's
+   `192.168.64.x` address; the dashboard renders it per server, and it
+   churns across rebuilds so never memorize it). Requires the Mac subnet
+   router, set up once on the host:
+
+   ```sh
+   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh          # advertise 192.168.64.0/24
+   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh status
+   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh remove
+   ```
+
+   Then approve the advertised `192.168.64.0/24` route in the admin console
+   (Machines) and enable "Use Tailscale subnets" on each client that should
+   take the fast path. The /24 is stable across sandbox rebuilds, so one
+   advertisement covers every sandbox.
+
+If the target project's dev server enforces a hostname allow-list (Vite
+does), it must admit the tailnet names — the webapp lists `sandbox` …
+`sandbox-9` in `vite.server.allowedHosts`.
+
 ## Dead or missing tailnet links
 
 Row exists but `http://sandbox:<port>` fails:

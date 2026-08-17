@@ -28,7 +28,7 @@ rather than by convention.
 Swap agents without editing config (`--loadout` ignores the defaults list):
 
 ```sh
-min activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
+min session activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
 ```
 
 ## Ordering

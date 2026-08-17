@@ -4,7 +4,7 @@ description = "kg: Pi (pi.dev) as the session's coding agent, instead of Claude 
 # Alternative agent loadout for trying the Pi coding agent. Mutually exclusive
 # with agent-claude by construction: both set DEV_AGENT_CMD, and a var set by
 # two loadouts is an activation-failing conflict. Apply with e.g.
-#     min activate --loadout sandbox-dashboard --loadout dev --loadout agent-pi
+#     min session activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
 # (`--loadout` ignores default_loadouts, so this swaps cleanly).
 #
 # `pi` is the catalog package for @earendil-works/pi-coding-agent (installed

@@ -5,7 +5,7 @@ description = "kg: zellij + vim with host dotfiles, zellij layout via PROMPT_COM
 # zellij layout is contributed by a sibling agent loadout (agent-claude or
 # agent-pi) through the DEV_AGENT_CMD var — this loadout carries everything
 # that stays the same regardless of agent. Anything a project NEEDS to run
-# belongs in that project's `[session]` block, so `min activate --no-loadouts`
+# belongs in that project's `[session]` block, so `min session activate --no-loadouts`
 # still yields a working checkout. Sandbox networking + discovery (userspace
 # tailnet, the :4320 dashboard) is the tailnet-dashboard sibling loadout.
 # See dev.d/minimal-session-hook.
