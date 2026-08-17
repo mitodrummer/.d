@@ -47,7 +47,7 @@
 
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { networkInterfaces } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
 import {
@@ -120,10 +120,11 @@ const START_HINT = process.env.SANDBOX_DASHBOARD_START_HINT ?? "pnpm dev:start";
 // MagicDNS name for the in-sandbox tailnet node. This loadout's
 // tailnet hook requests `sandbox`, but Tailscale dedupes the machine name
 // (sandbox-1, sandbox-2, …) when several sessions are on the tailnet at
-// once, so the hook records the settled name in `.tailscale/node-name`
-// after `tailscale up`. Read lazily per render — the dashboard starts
-// before that hook runs — falling back to the stable name until the file
-// appears (or forever, in a session with no tailnet).
+// once, so the hook records the settled name in `~/.tailscale/node-name`
+// (under the session HOME — the loadout writes nothing into the project
+// tree). Read lazily per render — the dashboard starts before that hook
+// runs — falling back to the stable name until the file appears (or
+// forever, in a session with no tailnet).
 const TAILNET_HOST_FALLBACK = "sandbox";
 
 // Test hook: point tailnetHost() at a fixture node-name file so tests don't
@@ -135,7 +136,7 @@ export function _setNodeNameFile(path: string | null): void {
 }
 
 function tailnetHost(): string {
-  const file = nodeNameFileOverride ?? resolve(repoRoot(), ".tailscale", "node-name");
+  const file = nodeNameFileOverride ?? resolve(homedir(), ".tailscale", "node-name");
   try {
     const name = readFileSync(file, "utf8").trim();
     if (/^[a-z0-9][a-z0-9-]*$/.test(name)) return name;

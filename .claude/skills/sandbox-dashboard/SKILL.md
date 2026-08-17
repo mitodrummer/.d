@@ -28,8 +28,9 @@ project's dev launcher do these:
    `server.strictPort: true`) — recorded port must equal listening port.
 
 Optional knobs (loadout `[vars]`): `SANDBOX_DASHBOARD_ASSIGNEE` (GitHub login
-for the assigned-issues section; `""` disables it), `SANDBOX_DASHBOARD_START_HINT`
-(empty-state copy), `SANDBOX_DASHBOARD_PORT`.
+for the assigned-issues section; unset = off — the code carries no default
+login), `SANDBOX_DASHBOARD_START_HINT` (empty-state copy),
+`SANDBOX_DASHBOARD_PORT`.
 
 ## Triage: server runs but no row appears
 
@@ -70,12 +71,15 @@ path prefix.
 The loadout's `sandbox-tailnet-up.sh` joins the sandbox as a **userspace**
 Tailscale node named `sandbox` (unprivileged: no `/dev/net/tun`, so
 web-serve only — **there is no SSH into the sandbox**, Tailscale SSH needs
-root). Auth is `TS_AUTHKEY` (env, or the project's `.env.local`); prefer an
+root). Auth: the loadout patches `~/.config/minimal/secrets/ts-authkey`
+(host-side) to `~/.config/sandbox-tailnet/authkey` in-session; env
+`TS_AUTHKEY` and a project `.env.local` line work as fallbacks. Prefer an
 OAuth client secret (`tskey-client-…`, scope `auth_keys`, tag `tag:sandbox`)
 — never expires, mints a fresh ephemeral key per join so dead nodes
-self-deregister. The node's statedir is `<repo-root>/.tailscale` (scratch;
-gitignored — it holds the node key). Ports are served over **HTTP**, not
-https (the cert feature hangs). Full mechanics in the script header.
+self-deregister. The node's statedir is `~/.tailscale` (session-scratch; it
+holds the node key and never touches the project tree). Ports are served
+over **HTTP**, not https (the cert feature hangs). Full mechanics in the
+script header.
 
 One-time Mac-side setup so names resolve: Tailscale app → "Use Tailscale
 DNS" ON; admin console → DNS → MagicDNS on, no unreachable global
@@ -103,8 +107,17 @@ Two ways to reach a dev server:
    advertisement covers every sandbox.
 
 If the target project's dev server enforces a hostname allow-list (Vite
-does), it must admit the tailnet names — the webapp lists `sandbox` …
-`sandbox-9` in `vite.server.allowedHosts`.
+does), it must admit the names this loadout exposes. The loadout exports
+them as `DEV_EXTRA_ALLOWED_HOSTS` (comma-separated, includes
+`.trycloudflare.com` for share tunnels); the webapp splices that env var
+into `vite.server.allowedHosts` in `astro.config.ts` without knowing what
+the names mean.
+
+**Auth-gated flows via an alias hostname misbehave** (webapp example:
+`BETTER_AUTH_URL` defaults to `http://localhost:4321`, so the session cookie
+domain and the OAuth callback won't match `http://sandbox:4321`). Keep auth
+work on `http://localhost:<port>`; pointing auth at the alias needs both the
+base-URL env AND the OAuth app's callback list updated.
 
 ## Dead or missing tailnet links
 
@@ -112,9 +125,9 @@ Row exists but `http://sandbox:<port>` fails:
 
 - A newly started server is tailnet-served by the dashboard's reconcile loop
   within ~10s of first passing the health gate — brief lag is normal.
-- Trust the settled node name in `<repo-root>/.tailscale/node-name` over the
-  literal `sandbox` (MagicDNS dedupes to `sandbox-1`, … under concurrent
-  sessions).
+- Trust the settled node name in `~/.tailscale/node-name` (session HOME)
+  over the literal `sandbox` (MagicDNS dedupes to `sandbox-1`, … under
+  concurrent sessions).
 - No name resolves at all → the join itself hasn't happened: run
   `bash ~/.local/bin/sandbox-tailnet-up.sh` (idempotent; no-ops without
   `TS_AUTHKEY` in the env or the project's `.env.local`).

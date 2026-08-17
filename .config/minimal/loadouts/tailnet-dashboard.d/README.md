@@ -6,7 +6,8 @@ components:
 - **Userspace tailnet** (`sandbox-tailnet-up.sh`): joins the Tailscale
   tailnet as an ephemeral node named `sandbox` (deduped to `sandbox-1`, …
   under concurrent sessions; the settled name lands in
-  `<repo-root>/.tailscale/node-name`). Userspace-networking mode because the
+  `~/.tailscale/node-name`, under the session HOME — the loadout writes
+  nothing into the project tree). Userspace-networking mode because the
   sandbox is unprivileged (no `/dev/net/tun`); web-serve only, no SSH.
 - **Discovery dashboard** (`sandbox-dashboard.ts`, default `:4320`): one HTTP
   server per sandbox listing every running worktree dev server of the project
@@ -30,8 +31,12 @@ runtime is node builtins only.
 
 ## Tailnet auth
 
-`sandbox-tailnet-up.sh` no-ops without `TS_AUTHKEY` (env, or a
-`TS_AUTHKEY=` line in the project's `.env.local`). Preferred form: a
+`sandbox-tailnet-up.sh` reads the key from
+`~/.config/sandbox-tailnet/authkey` — patched in by the loadout from
+`~/.config/minimal/secrets/ts-authkey` on the host (0600; the `secrets/` dir
+is gitignored from this repo) — else the `TS_AUTHKEY` env var, else a
+`TS_AUTHKEY=` line in the project's `.env.local`. It no-ops without any of
+them. Preferred form: a
 Tailscale **OAuth client secret** (`tskey-client-…`, scope `auth_keys`, tag
 `tag:sandbox`) — never expires, mints a fresh ephemeral key per join so dead
 nodes self-deregister. A tagged ephemeral+reusable auth key works too but
@@ -46,9 +51,16 @@ router advertising the VM bridge subnet): `host/setup-sandbox-tailnet.sh`.
 session at `~/.local/lib/sandbox-dashboard/` and the tailnet script at
 `~/.local/bin/sandbox-tailnet-up.sh`, then starts the dashboard and runs the
 join from its `on_activate` hooks. Hook cwd (the project root) is the
-discovery anchor — `git worktree list`, pidfile cwd matching,
-`.tailscale/node-name`, and the `.env.local` key fallback all resolve
-against it.
+discovery anchor — `git worktree list`, pidfile cwd matching, and the
+`.env.local` key fallback resolve against it (the tailnet statedir and
+node-name file live under the session `$HOME`).
+
+When an assignee is configured, the dashboard also snapshots that login's
+open issues to `$TMPDIR/sandbox-dashboard-assigned-issues.json`; the
+`~/.claude/hooks/assigned-issues.sh` UserPromptSubmit hook (also in these
+dotfiles, registered in `~/.claude/settings.json`) reads it — assignee
+included — and surfaces unclaimed work at the next prompt, self-guarding to
+a no-op when the file is absent.
 
 ## Integrating with any project
 
@@ -69,8 +81,11 @@ that honors a three-part contract:
 
 Rows appear (and ports get tailnet-served) only when all three hold; the
 dashboard must itself be started from the project's repo root. If the dev
-server enforces a hostname allow-list (Vite does), it must accept the tailnet
-names (`sandbox` … `sandbox-9`). PR/issue enrichment additionally wants `gh`
+server enforces a hostname allow-list (Vite does), it must accept the names
+this loadout exposes — the loadout exports them as the generic
+`DEV_EXTRA_ALLOWED_HOSTS` (comma-separated) so a project can splice them into
+its own config without knowing about any particular tooling (the webapp does
+this in `astro.config.ts`). PR/issue enrichment additionally wants `gh`
 authenticated in the session.
 
 ## Configuration
@@ -83,7 +98,8 @@ Environment variables, typically set from the loadout's `[vars]`:
 | `SANDBOX_DASHBOARD_HEALTH_PATH` | `/healthcheck` | Liveness path probed on each discovered port |
 | `SANDBOX_DASHBOARD_ASSIGNEE` | `agent-137` | GitHub login for the assigned-issues section; empty string disables the section and its `gh` calls |
 | `SANDBOX_DASHBOARD_START_HINT` | `pnpm dev:start` | Command shown in the empty state |
-| `TS_AUTHKEY` | unset | Tailnet join key (see above); unset → local-only |
+| `TS_AUTHKEY` | unset | Tailnet join key override (normally the patched key file is used); nothing available → local-only |
+| `DEV_EXTRA_ALLOWED_HOSTS` | set by this loadout | Hostnames the project's dev server should admit (generic seam, see above) |
 
 ## Development
 

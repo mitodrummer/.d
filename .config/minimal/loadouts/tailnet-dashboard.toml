@@ -6,8 +6,8 @@ description = "kg: userspace tailnet + in-sandbox discovery dashboard on :4320 (
 #
 #   - the userspace tailnet: sandbox-tailnet-up.sh JOINS the tailnet as an
 #     ephemeral node named `sandbox` and records the settled MagicDNS name in
-#     <repo>/.tailscale/node-name. It no-ops without TS_AUTHKEY (env, or the
-#     project's .env.local).
+#     ~/.tailscale/node-name. Its key comes from the patched authkey file
+#     below (else env / a project .env.local); keyless, it no-ops.
 #   - the discovery dashboard: lists every running worktree dev server of the
 #     project in cwd, and — as the one component that knows which ports are
 #     live — reconciles `tailscale serve` for its own port and every healthy
@@ -19,8 +19,8 @@ description = "kg: userspace tailnet + in-sandbox discovery dashboard on :4320 (
 # dashboard stopped → tailnet node still up (nothing served).
 #
 # The project side only honors the discovery contract (pidfiles +
-# /healthcheck + strictPort + tailnet-hostname allowedHosts) — no tailnet or
-# dashboard code lives in a project repo.
+# /healthcheck + strictPort) plus the generic DEV_EXTRA_ALLOWED_HOSTS seam —
+# no tailnet or dashboard code, names, or keys live in a project repo.
 
 # node-lts runs the TS server (node ≥22.18 strips types natively); git + gh
 # feed worktree/PR/issue discovery; cloudflared backs the opt-in public Share
@@ -44,14 +44,21 @@ patches = [
     { dest = ".local/lib/sandbox-dashboard/tunnels.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/tunnels.ts" },
     { dest = ".local/lib/sandbox-dashboard/tailnet-serve.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/tailnet-serve.ts" },
     { dest = ".local/bin/sandbox-tailnet-up.sh", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/sandbox-tailnet-up.sh" },
+
+    # Tailnet auth key (a real secret). Lives host-side in
+    # ~/.config/minimal/secrets/ (0700, gitignored from the dotfiles repo) and
+    # is patched to the path sandbox-tailnet-up.sh reads first — so no project
+    # has to carry TS_AUTHKEY in its .env files. Skipped with a warning when
+    # the host file doesn't exist (keyless setups just get no tailnet).
+    { dest = ".config/sandbox-tailnet/authkey", source = "~/.config/minimal/secrets/ts-authkey" },
 ]
 
 # Dashboard first so its listener exists ASAP; the tailnet join follows. The
 # order is comfort, not correctness — the serve reconciler catches up
 # whenever the join lands. Both run with cwd = project root: the dashboard
-# anchors discovery on it, the tailnet script finds .env.local (TS_AUTHKEY
-# fallback) and the .tailscale state dir under it. `|| true` on both: they
-# are niceties and must never fail activation.
+# anchors discovery on it, and the tailnet script uses it for the .env.local
+# key fallback (its statedir lives under $HOME). `|| true` on both: they are
+# niceties and must never fail activation.
 [[lifecycle_hooks]]
 description = "Start the sandbox discovery dashboard on :4320"
 on_activate = { type = "inline", value = "bash ~/.local/lib/sandbox-dashboard/dashboard.sh start || true" }
@@ -64,9 +71,24 @@ on_activate = { type = "inline", value = "bash ~/.local/lib/sandbox-dashboard/da
 description = "Join tailnet as ephemeral node `sandbox` (no-op without TS_AUTHKEY)"
 on_activate = { type = "inline", value = "bash ~/.local/bin/sandbox-tailnet-up.sh up || true", timeout = 120 }
 
-# Project-facing dashboard knobs (defaults match gominimal/webapp; see
-# tailnet-dashboard.d/README.md). Uncomment and adjust for other projects:
-#[vars]
+[vars]
+# The hostnames this loadout exposes the dev servers under. Projects don't
+# know about the tailnet: their dev server just honors a generic
+# comma-separated allow-list from the environment (the webapp reads this in
+# astro.config.ts's vite.server.allowedHosts). sandbox-1..9 cover Tailscale's
+# machine-name dedupe under concurrent sessions; the leading-dot
+# .trycloudflare.com admits the dashboard's opt-in public share tunnels,
+# which forward the quick-tunnel Host header unchanged.
+DEV_EXTRA_ALLOWED_HOSTS = "sandbox,sandbox-1,sandbox-2,sandbox-3,sandbox-4,sandbox-5,sandbox-6,sandbox-7,sandbox-8,sandbox-9,.trycloudflare.com"
+
+# The GitHub login whose open assigned issues the dashboard surfaces (and
+# snapshots to $TMPDIR for the assigned-issues prompt hook). The dashboard
+# code carries no default — unset means the section is off. The hyphen is
+# load-bearing: `gh issue list --assignee agent137` (no hyphen) matches
+# nothing.
+SANDBOX_DASHBOARD_ASSIGNEE = "agent-137"
+
+# Other project-facing dashboard knobs (defaults match gominimal/webapp; see
+# tailnet-dashboard.d/README.md). Uncomment and adjust per project:
 #SANDBOX_DASHBOARD_HEALTH_PATH = "/healthz"
-#SANDBOX_DASHBOARD_ASSIGNEE = ""            # empty disables the issues section
 #SANDBOX_DASHBOARD_START_HINT = "make dev"

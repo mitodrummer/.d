@@ -6,7 +6,7 @@
 # dashboard), which discovers live dev servers and serves them as they
 # appear, in whatever order the hooks ran.
 # Concurrent sessions: control dedupes the machine name (sandbox-1, -2, …);
-# the settled name is recorded in <repo>/.tailscale/node-name and read by the
+# the settled name is recorded in ~/.tailscale/node-name and read by the
 # dashboard for its rendered URLs.
 #
 # The Minimal sandbox is fully unprivileged (uid 1000, no sudo, no
@@ -17,7 +17,10 @@
 # That is why TS_AUTHKEY must be an EPHEMERAL key — the node deregisters itself
 # when the session ends, instead of leaving a dead `sandbox` behind every time.
 #
-# Auth is TS_AUTHKEY (env or .env.local), in either form:
+# Auth: the key is read from ~/.config/sandbox-tailnet/authkey (patched in by
+# the loadout from ~/.config/minimal/secrets/ts-authkey on the host), else the
+# TS_AUTHKEY env var, else a TS_AUTHKEY= line in the project's .env.local (for
+# projects that keep it there). Either form works:
 #   - PREFERRED: an OAuth client secret (`tskey-client-...`) with the
 #     `auth_keys` scope and tag:sandbox. Client secrets never expire; each
 #     `up` mints a fresh tagged key on the fly, and `ephemeral` DEFAULTS TO
@@ -33,23 +36,23 @@
 # Usage: sandbox-tailnet-up.sh [up|status|down]   (default: up)
 set -euo pipefail
 
-# The project directory — where .env.local (TS_AUTHKEY) and the .tailscale
-# state dir live.
-#
-# This used to be derived from the script's own location ($SCRIPT_DIR/..), which
-# was right while it lived at <repo>/scripts/. The script now ships in a loadout
-# and is patched into the session at ~/.local/bin/, where that expression
-# resolves to ~/.local — so the auth key was never found and the tailnet came up
-# as a silent no-op. The invoking hook runs with the project root as cwd, so use
-# that; SANDBOX_TAILNET_REPO_ROOT overrides it for a standalone run elsewhere.
+# The project directory — only used for the .env.local TS_AUTHKEY fallback.
+# The invoking hook runs with the project root as cwd, so use that;
+# SANDBOX_TAILNET_REPO_ROOT overrides it for a standalone run elsewhere.
 REPO_ROOT="${SANDBOX_TAILNET_REPO_ROOT:-$PWD}"
 
+# Loadout-patched auth key file (see the header). Preferred over env/.env.local
+# so no project has to carry the key in its own files.
+AUTHKEY_FILE="$HOME/.config/sandbox-tailnet/authkey"
+
 # Identity/cert dir for the CURRENT session only — it does not survive session
-# destruction (see the header). Gitignored: it holds the node key and must never
-# be committed, nor carried in from the host, which is how a months-old RunSSH
-# pref once leaked into every session. Use a directory (--statedir), NOT a
-# single --state file: the file form errors with "no var root".
-STATE_DIR="$REPO_ROOT/.tailscale"
+# destruction (see the header), and it holds the node key, so it must never be
+# carried in from the host (a months-old RunSSH pref once leaked into every
+# session that way). Under $HOME rather than the project dir so the loadout
+# writes nothing into the project tree — the dashboard reads node-name from
+# here too. Use a directory (--statedir), NOT a single --state file: the file
+# form errors with "no var root".
+STATE_DIR="$HOME/.tailscale"
 # Runtime control socket, recreated on each sandbox boot. Must match TS_SOCK
 # in the dashboard's tailnet-serve.ts so the serve reconciler targets the
 # same daemon.
@@ -57,12 +60,17 @@ SOCK="/tmp/ts/tailscaled.sock"
 
 ts() { tailscale --socket="$SOCK" "$@"; }
 
-# Load TS_AUTHKEY from .env.local when not already exported, so a standalone
-# run works without the dev entry pre-exporting it. Grep only that one var (no
+# Load TS_AUTHKEY: loadout-patched key file first, then the environment, then
+# a TS_AUTHKEY= line in the project's .env.local. Grep only that one var (no
 # blanket `source`, which would pull every secret into this shell) and NEVER
 # print the value.
 load_authkey_from_env_file() {
   [ -n "${TS_AUTHKEY:-}" ] && return 0
+  if [ -f "$AUTHKEY_FILE" ]; then
+    TS_AUTHKEY="$(head -1 "$AUTHKEY_FILE" | tr -d '[:space:]')"
+    export TS_AUTHKEY
+    [ -n "$TS_AUTHKEY" ] && return 0
+  fi
   local env_file="$REPO_ROOT/.env.local"
   [ -f "$env_file" ] || return 0
   # Strip the key= prefix, then a trailing ` # inline comment` (auth keys never
@@ -176,7 +184,7 @@ join_tailnet() {
 cmd_up() {
   load_authkey_from_env_file
   if [ -z "${TS_AUTHKEY:-}" ]; then
-    echo "TS_AUTHKEY unset; skipping Tailscale sandbox join (set it in .env.local to enable)." >&2
+    echo "TS_AUTHKEY unset; skipping Tailscale sandbox join (provision ~/.config/minimal/secrets/ts-authkey on the host to enable)." >&2
     exit 0
   fi
   ensure_installed

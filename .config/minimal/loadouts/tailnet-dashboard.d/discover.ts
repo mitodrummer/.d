@@ -101,17 +101,12 @@ interface PrCacheEntry {
 
 const prCache = new Map<string, PrCacheEntry>();
 
-// GitHub login whose open assigned issues the dashboard surfaces. The in-sandbox
-// agent authenticates as this account (`gh api user` reports `agent-137`), so
-// issues assigned to it are work the agent is expected to pick up. The hyphen is
-// load-bearing: `gh issue list --assignee agent137` (no hyphen) matches nothing.
-// File/hook names use the hyphenless "agent137" spelling for brevity; only this
-// constant — the value handed to `gh` — must match the real login.
-//
-// Other developers/projects: override via SANDBOX_DASHBOARD_ASSIGNEE in the
-// loadout's [vars]; the empty string disables the assigned-issues section
-// (and its gh calls) entirely.
-export const ASSIGNED_ISSUES_LOGIN = process.env.SANDBOX_DASHBOARD_ASSIGNEE ?? "agent-137";
+// GitHub login whose open assigned issues the dashboard surfaces — the queue a
+// developer's automation account is expected to pick work from. Set via
+// SANDBOX_DASHBOARD_ASSIGNEE in the loadout's [vars]; unset (or empty)
+// disables the section, its gh calls, and the state-file write, so this code
+// carries no developer-specific login.
+export const ASSIGNED_ISSUES_LOGIN = process.env.SANDBOX_DASHBOARD_ASSIGNEE ?? "";
 
 // `gh issue list --assignee <login> --json number,title,url` is an external
 // process boundary — validated with the same fail-closed guards as the PR list
@@ -535,11 +530,14 @@ export function _resetAssignedIssuesCache(): void {
 
 /**
  * Default path for the seen-set state file the dashboard writes and the
- * UserPromptSubmit hook reads. Lives under `$TMPDIR` (off the bind-mounted
- * project dir, like the dev pidfiles) so it's sandbox-local and disposable.
+ * UserPromptSubmit hook (~/.claude/hooks/assigned-issues.sh, shipped beside
+ * this loadout's Claude config) reads. Lives under `$TMPDIR` (off the
+ * bind-mounted project dir, like the dev pidfiles) so it's sandbox-local and
+ * disposable. The recorded `assignee` field tells the hook whose queue the
+ * snapshot is — no login is hardcoded on either side.
  */
 export function assignedIssuesStatePath(): string {
-  return join(process.env.TMPDIR ?? tmpdir(), "agent137-assigned-issues.json");
+  return join(process.env.TMPDIR ?? tmpdir(), "sandbox-dashboard-assigned-issues.json");
 }
 
 export interface DiscoverAssignedIssuesOptions {
@@ -630,7 +628,7 @@ function isAssignedIssuesState(v: unknown): v is AssignedIssuesState {
  */
 export async function writeAssignedIssuesState(
   issues: readonly AssignedIssue[],
-  opts: { statePath?: string; now?: () => number } = {},
+  opts: { statePath?: string; now?: () => number; assignee?: string } = {},
 ): Promise<number[]> {
   const statePath = opts.statePath ?? assignedIssuesStatePath();
   const nowIso = new Date((opts.now ?? Date.now)()).toISOString();
@@ -640,7 +638,7 @@ export async function writeAssignedIssuesState(
   const newNumbers = issues.filter((i) => !previousNumbers.has(i.number)).map((i) => i.number);
 
   const state: AssignedIssuesState = {
-    assignee: ASSIGNED_ISSUES_LOGIN,
+    assignee: opts.assignee ?? ASSIGNED_ISSUES_LOGIN,
     updatedAt: nowIso,
     issues: [...issues],
   };

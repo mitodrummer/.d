@@ -24,6 +24,10 @@ patches = [
     { dest = ".claude/settings.json", source = "~/.claude/settings.json" },
     { dest = ".claude/settings.local.json", source = "~/.claude/settings.local.json" },
     { dest = ".claude/skills/", source = "~/.claude/skills/**/*" },
+    # Hook scripts referenced by settings.json (e.g. the assigned-issues
+    # UserPromptSubmit hook, which reads the sandbox dashboard's state file
+    # and self-guards to a no-op without it).
+    { dest = ".claude/hooks/", source = "~/.claude/hooks/**/*" },
 ]
 
 # First-run state: a valid CLAUDE_CODE_OAUTH_TOKEN in the environment is NOT

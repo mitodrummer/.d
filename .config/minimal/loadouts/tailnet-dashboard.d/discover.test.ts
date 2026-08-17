@@ -417,8 +417,8 @@ describe("discoverAssignedIssues", () => {
       return JSON.stringify([{ number: 1, title: "x", url: "https://example/1" }]);
     };
     const now = () => 1_000;
-    await discoverAssignedIssues({ exec, now });
-    await discoverAssignedIssues({ exec, now });
+    await discoverAssignedIssues({ exec, now, assignee: "someone" });
+    await discoverAssignedIssues({ exec, now, assignee: "someone" });
     expect(calls).toBe(1);
   });
 
@@ -428,8 +428,8 @@ describe("discoverAssignedIssues", () => {
       calls += 1;
       return "[]";
     };
-    await discoverAssignedIssues({ exec, now: () => 1_000 });
-    await discoverAssignedIssues({ exec, now: () => 1_000 + 60_001 });
+    await discoverAssignedIssues({ exec, now: () => 1_000, assignee: "someone" });
+    await discoverAssignedIssues({ exec, now: () => 1_000 + 60_001, assignee: "someone" });
     expect(calls).toBe(2);
   });
 
@@ -448,14 +448,14 @@ describe("discoverAssignedIssues", () => {
     const exec: ExecFn = async () => {
       throw new Error("gh not found");
     };
-    expect(await discoverAssignedIssues({ exec })).toEqual([]);
+    expect(await discoverAssignedIssues({ exec, assignee: "someone" })).toEqual([]);
     expect(warnSpy).toHaveBeenCalled();
   });
 
   it("returns an empty list when gh returns malformed JSON", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const exec: ExecFn = async () => "not json";
-    expect(await discoverAssignedIssues({ exec })).toEqual([]);
+    expect(await discoverAssignedIssues({ exec, assignee: "someone" })).toEqual([]);
     expect(warnSpy).toHaveBeenCalled();
   });
 
@@ -467,12 +467,12 @@ describe("discoverAssignedIssues", () => {
       throw new Error("gh not found");
     };
     // First call fails and caches [] for the 10s error TTL.
-    await discoverAssignedIssues({ exec, now: () => 0 });
+    await discoverAssignedIssues({ exec, now: () => 0, assignee: "someone" });
     // Within the error TTL the cache is reused.
-    await discoverAssignedIssues({ exec, now: () => 9_000 });
+    await discoverAssignedIssues({ exec, now: () => 9_000, assignee: "someone" });
     expect(calls).toBe(1);
     // Past the error TTL (but well within the 60s success TTL) it re-queries.
-    await discoverAssignedIssues({ exec, now: () => 11_000 });
+    await discoverAssignedIssues({ exec, now: () => 11_000, assignee: "someone" });
     expect(calls).toBe(2);
   });
 });
@@ -504,7 +504,11 @@ describe("assigned-issues state file", () => {
       { number: 3, title: "First", url: "https://example/3" },
       { number: 4, title: "Second", url: "https://example/4" },
     ];
-    const fresh = await writeAssignedIssuesState(issues, { statePath, now: () => 0 });
+    const fresh = await writeAssignedIssuesState(issues, {
+      statePath,
+      now: () => 0,
+      assignee: "agent-137",
+    });
     expect(fresh).toEqual([3, 4]);
 
     const state = await readAssignedIssuesState(statePath);

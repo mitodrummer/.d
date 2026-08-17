@@ -1,5 +1,17 @@
 {
   "model": "claude-fable-5[1m]",
   "effortLevel": "xhigh",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME\"/.claude/hooks/assigned-issues.sh"
+          }
+        ]
+      }
+    ]
+  }
 }

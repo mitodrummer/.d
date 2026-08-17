@@ -1,0 +1,4 @@
+# Never track loadout secrets in the dotfiles repo.
+.config/minimal/secrets/
+# Machine-specific (absolute project paths in the hook allow-list).
+.config/minimal/user_policy.toml
