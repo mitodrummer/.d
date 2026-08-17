@@ -50,6 +50,18 @@ status` (is it running, from the right cwd?), `.../dashboard.sh logs 50`
 actually sees). The dashboard must have been started from the project's repo
 root — a dashboard started elsewhere discovers nothing.
 
+## Agent surface: `/manifest.json`
+
+Everything the page shows is JSON at `GET /manifest.json` (shape:
+`{ worktrees: DiscoveredWorktree[], assignedIssues: AssignedIssue[],
+directHost: string | null, tailnetHost, cloudflaredAvailable, orphanTunnels }`).
+Only `worktrees` entries carry a `port`; build each server's two URLs as
+`http://<tailnetHost>:<port>` (works anywhere) and, when `directHost` is
+non-null, `http://<directHost>:<port>` (fast, same network). The page itself
+is discovery-only — it never proxies or rewrites URLs, because dev servers'
+absolute asset paths, HMR WebSockets, and view transitions all break under a
+path prefix.
+
 ## Dead or missing tailnet links
 
 Row exists but `http://sandbox:<port>` fails: the tailnet serve step maps a
