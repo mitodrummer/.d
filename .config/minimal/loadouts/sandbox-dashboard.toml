@@ -39,3 +39,10 @@ patches = [
 [[lifecycle_hooks]]
 description = "Start the sandbox discovery dashboard on :4320"
 on_activate = { type = "inline", value = "bash ~/.local/lib/sandbox-dashboard/dashboard.sh start || true" }
+
+# Project-facing knobs (defaults match gominimal/webapp; see
+# sandbox-dashboard.d/README.md). Uncomment and adjust for other projects:
+#[vars]
+#SANDBOX_DASHBOARD_HEALTH_PATH = "/healthz"
+#SANDBOX_DASHBOARD_ASSIGNEE = ""            # empty disables the issues section
+#SANDBOX_DASHBOARD_START_HINT = "make dev"

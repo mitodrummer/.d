@@ -107,7 +107,11 @@ const prCache = new Map<string, PrCacheEntry>();
 // load-bearing: `gh issue list --assignee agent137` (no hyphen) matches nothing.
 // File/hook names use the hyphenless "agent137" spelling for brevity; only this
 // constant — the value handed to `gh` — must match the real login.
-export const ASSIGNED_ISSUES_LOGIN = "agent-137";
+//
+// Other developers/projects: override via SANDBOX_DASHBOARD_ASSIGNEE in the
+// loadout's [vars]; the empty string disables the assigned-issues section
+// (and its gh calls) entirely.
+export const ASSIGNED_ISSUES_LOGIN = process.env.SANDBOX_DASHBOARD_ASSIGNEE ?? "agent-137";
 
 // `gh issue list --assignee <login> --json number,title,url` is an external
 // process boundary — validated with the same fail-closed guards as the PR list
@@ -240,16 +244,21 @@ function cwdMatchesWorktree(cwd: string, worktreePaths: ReadonlySet<string>): bo
   return worktreePaths.has(cwd);
 }
 
+// Liveness endpoint every discovered dev server must answer with a 200. The
+// default matches the webapp; projects exposing /healthz or similar override
+// via SANDBOX_DASHBOARD_HEALTH_PATH in the loadout's [vars].
+const HEALTH_PATH = process.env.SANDBOX_DASHBOARD_HEALTH_PATH ?? "/healthcheck";
+
 /**
- * Probe `http://127.0.0.1:<port>/healthcheck` and resolve true only on a 200.
- * Uses a short {@link HEALTHCHECK_TIMEOUT_MS} abort so a wedged or
+ * Probe `http://127.0.0.1:<port>${HEALTH_PATH}` and resolve true only on a
+ * 200. Uses a short {@link HEALTHCHECK_TIMEOUT_MS} abort so a wedged or
  * non-listening port fails fast rather than stalling the dashboard refresh.
  */
 async function defaultProbeHealth(port: number): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTHCHECK_TIMEOUT_MS);
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/healthcheck`, {
+    const res = await fetch(`http://127.0.0.1:${port}${HEALTH_PATH}`, {
       signal: controller.signal,
       // A liveness probe must observe the live process, never a cached 200.
       cache: "no-store",
@@ -558,6 +567,8 @@ export async function discoverAssignedIssues(
   const exec = opts.exec ?? defaultExec;
   const now = (opts.now ?? Date.now)();
   const assignee = opts.assignee ?? ASSIGNED_ISSUES_LOGIN;
+  // Empty assignee = the section is disabled; never shell out to gh for it.
+  if (assignee === "") return [];
 
   const cached = assignedIssuesCache.get(assignee);
   if (cached && cached.expiresAt > now) return cached.value;

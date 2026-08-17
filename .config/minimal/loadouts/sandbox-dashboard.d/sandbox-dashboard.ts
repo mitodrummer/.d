@@ -111,6 +111,10 @@ interface Manifest {
 const DEFAULT_PORT = 4320;
 const REFRESH_MS = 4000;
 
+// Copy shown in the empty state's "start a server" hint. The default matches
+// the webapp's launcher; other projects override via the loadout's [vars].
+const START_HINT = process.env.SANDBOX_DASHBOARD_START_HINT ?? "pnpm dev:start";
+
 // MagicDNS name for the in-sandbox tailnet node. The developer loadout's
 // tailnet hook requests `sandbox`, but Tailscale dedupes the machine name
 // (sandbox-1, sandbox-2, …) when several sessions are on the tailnet at
@@ -256,7 +260,7 @@ function renderRowsHtml(
   tailnetName: string,
 ): string {
   if (rows.length === 0) {
-    return `<div class="empty">No dev servers running. Start one with <code>pnpm dev:start</code>.</div>`;
+    return `<div class="empty">No dev servers running. Start one with <code>${escapeHtml(START_HINT)}</code>.</div>`;
   }
   const body = rows
     .map((r) => {
@@ -402,11 +406,15 @@ function renderHtml(manifest: Manifest): string {
 <div id="flash"></div>
 <div id="root">${initialRows}</div>
 <div id="orphans">${initialOrphans}</div>
-<h2>Assigned to ${escapeHtml(ASSIGNED_ISSUES_LOGIN)}</h2>
-<div id="issues">${initialIssues}</div>
+${
+  ASSIGNED_ISSUES_LOGIN
+    ? `<h2>Assigned to ${escapeHtml(ASSIGNED_ISSUES_LOGIN)}</h2>\n<div id="issues">${initialIssues}</div>`
+    : ""
+}
 <script>
 const REFRESH_MS = ${REFRESH_MS};
 const ASSIGNED_LOGIN = ${JSON.stringify(ASSIGNED_ISSUES_LOGIN)};
+const START_HINT = ${JSON.stringify(START_HINT)};
 const $ = (id) => document.getElementById(id);
 function esc(s) {
   return String(s)
@@ -501,21 +509,25 @@ async function refresh() {
     const cloudflaredAvailable = manifest.cloudflaredAvailable === true;
     const newSet = new Set(Array.isArray(manifest.newAssignedIssueNumbers) ? manifest.newAssignedIssueNumbers : []);
     $("root").innerHTML = rows.length === 0
-      ? '<div class="empty">No dev servers running. Start one with <code>pnpm dev:start</code>.</div>'
+      ? '<div class="empty">No dev servers running. Start one with <code>' + esc(START_HINT) + '</code>.</div>'
       : '<table><thead><tr>'
         + '<th>Branch</th><th>URLs</th><th>Public share</th><th>Pull request</th><th>Worktree</th>'
         + '</tr></thead><tbody>' + rows.map((r) => row(r, directHost, cloudflaredAvailable)).join("") + '</tbody></table>';
     $("orphans").innerHTML = orphanHtml(orphans);
-    $("issues").innerHTML = issues.length === 0
-      ? '<div class="empty">No open issues assigned to <code>' + esc(ASSIGNED_LOGIN) + '</code>.</div>'
-      : '<ul class="issues">' + issues.map((i) => issueRow(i, newSet)).join("") + '</ul>';
+    // The issues section (and its element) only exists when a non-empty
+    // assignee is configured — see the conditional block in the markup above.
+    if (ASSIGNED_LOGIN) {
+      $("issues").innerHTML = issues.length === 0
+        ? '<div class="empty">No open issues assigned to <code>' + esc(ASSIGNED_LOGIN) + '</code>.</div>'
+        : '<ul class="issues">' + issues.map((i) => issueRow(i, newSet)).join("") + '</ul>';
+    }
   } catch (e) {
     // Clear ALL panels so a fetch failure can't leave a section showing stale
     // data next to a "fetch failed" one — including a stale PUBLIC tunnel row.
     const msg = '<div class="empty">Manifest fetch failed: ' + esc(e && e.message ? e.message : String(e)) + '</div>';
     $("root").innerHTML = msg;
     $("orphans").innerHTML = "";
-    $("issues").innerHTML = msg;
+    if (ASSIGNED_LOGIN) $("issues").innerHTML = msg;
   }
 }
 function flash(msg) {
@@ -649,11 +661,14 @@ async function loadManifest(): Promise<Manifest> {
   // Persist the seen-set for the hook (its return value is consumed by the
   // hook via the file, not here). Kept in its own try so a write failure can't
   // skip the badge computation below — badge state is independent of the disk
-  // write.
-  try {
-    await writeAssignedIssuesState(assignedIssues);
-  } catch (err) {
-    console.warn("[dashboard] assigned-issues state write failed:", err);
+  // write. Skipped entirely when the section is disabled, so a blank-assignee
+  // dashboard can't overwrite another consumer's state file with emptiness.
+  if (ASSIGNED_ISSUES_LOGIN !== "") {
+    try {
+      await writeAssignedIssuesState(assignedIssues);
+    } catch (err) {
+      console.warn("[dashboard] assigned-issues state write failed:", err);
+    }
   }
   const newAssignedIssueNumbers = computeNewlyAssigned(assignedIssues);
 

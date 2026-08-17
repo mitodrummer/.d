@@ -433,6 +433,16 @@ describe("discoverAssignedIssues", () => {
     expect(calls).toBe(2);
   });
 
+  it("returns an empty list without calling gh when the assignee is empty", async () => {
+    let calls = 0;
+    const exec: ExecFn = async () => {
+      calls += 1;
+      return "[]";
+    };
+    expect(await discoverAssignedIssues({ exec, assignee: "" })).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
   it("returns an empty list when gh fails", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const exec: ExecFn = async () => {

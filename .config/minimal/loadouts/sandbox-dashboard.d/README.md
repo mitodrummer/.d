@@ -22,10 +22,37 @@ session at `~/.local/lib/sandbox-dashboard/` and starts the server from its
 discovery anchor — `git worktree list`, pidfile cwd matching, and
 `.tailscale/node-name` all resolve against it.
 
-Contract with a discoverable project: its dev-server launcher writes
-`${TMPDIR:-/tmp}/minimal-dev-<port>.pid` (or legacy in-worktree
-`.dev[-<port>].pid`) pidfiles and serves `GET /healthcheck` → 200. The webapp's
-`scripts/dev.sh` conforms.
+## Integrating with any project
+
+The dashboard is not Astro- or framework-specific — it discovers anything
+that honors a three-part contract:
+
+1. **Pidfile** — the dev-server launcher writes
+   `${TMPDIR:-/tmp}/minimal-dev-<port>.pid` containing the launcher's PID
+   (a `setsid` group leader survives best; legacy in-worktree
+   `.dev-<port>.pid` / `.dev.pid` forms are also honored).
+2. **Health endpoint** — the server answers
+   `GET http://127.0.0.1:<port>/healthcheck` with a 200 (path configurable,
+   see below). Bind the recorded port exactly — configure your server to fail
+   on a taken port rather than silently walking to another, or the probe will
+   correctly refuse to attribute it.
+3. **Worktree cwd** — the server process runs with its git worktree as cwd;
+   discovery attributes servers to worktrees by `/proc/<pid>/cwd`.
+
+Rows appear only when all three hold; the dashboard must itself be started
+from the project's repo root (its cwd anchors `git worktree list`). PR/issue
+enrichment additionally wants `gh` authenticated in the session.
+
+## Configuration
+
+Environment variables, typically set from the loadout's `[vars]`:
+
+| Var | Default | Meaning |
+| --- | --- | --- |
+| `SANDBOX_DASHBOARD_PORT` | `4320` | Listen port |
+| `SANDBOX_DASHBOARD_HEALTH_PATH` | `/healthcheck` | Liveness path probed on each discovered port |
+| `SANDBOX_DASHBOARD_ASSIGNEE` | `agent-137` | GitHub login for the assigned-issues section; empty string disables the section and its `gh` calls |
+| `SANDBOX_DASHBOARD_START_HINT` | `pnpm dev:start` | Command shown in the empty state |
 
 The `$TMPDIR/agent137-assigned-issues.json` state file this server writes is
 read by the webapp's `scripts/agent137-assigned-hook.sh` (UserPromptSubmit
