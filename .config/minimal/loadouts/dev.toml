@@ -1,22 +1,15 @@
 name        = "dev"
-description = "kg: zellij + vim with host dotfiles, tailnet on_activate + zellij via PROMPT_COMMAND (agent-agnostic)"
+description = "kg: zellij + vim with host dotfiles, zellij layout via PROMPT_COMMAND (agent-agnostic)"
 
 # Personal tooling only, and AGENT-AGNOSTIC: which coding agent runs in the
 # zellij layout is contributed by a sibling agent loadout (agent-claude or
 # agent-pi) through the DEV_AGENT_CMD var — this loadout carries everything
 # that stays the same regardless of agent. Anything a project NEEDS to run
 # belongs in that project's `[session]` block, so `min activate --no-loadouts`
-# still yields a working checkout. The sandbox dashboard is a third sibling
-# (sandbox-dashboard.toml). See dev.d/minimal-session-hook.
-#
-# tailscale: dev.d/sandbox-tailnet-up.sh runs tailscaled in userspace-networking
-# mode (the sandbox is unprivileged, with no /dev/net/tun) to expose the dev
-# servers as http://sandbox:<port>. It moved here from webapp's [session] block
-# along with the script — exposing a sandbox on a personal tailnet is a
-# developer choice, not something the project should impose. Declared rather
-# than left to the script's `min add tailscale` fallback, so it is fetched with
-# the rest of the session instead of installed on first run.
-packages = ["vim", "zellij", "fzf", "tailscale"]
+# still yields a working checkout. Sandbox networking + discovery (userspace
+# tailnet, the :4320 dashboard) is the tailnet-dashboard sibling loadout.
+# See dev.d/minimal-session-hook.
+packages = ["vim", "zellij", "fzf"]
 
 # Patches are one-way host -> session copies: the session cannot write back, so
 # host config can't be corrupted from inside the sandbox.
@@ -58,28 +51,14 @@ patches = [
     # dev/, not dev.d/ — which is what broke activation when min 0.5.2 started
     # executing hooks natively.)
     { dest = ".local/bin/minimal-session-hook", source = "~/.config/minimal/loadouts/dev.d/minimal-session-hook" },
-    { dest = ".local/bin/", source = "~/.config/minimal/loadouts/dev.d/*.sh" },
 ]
 
-# Non-interactive personal setup only. The interactive layer (gh device-code
-# login, the foreground zellij takeover) CANNOT live in a lifecycle hook:
-# on_activate has no terminal and a failing on_activate fails the whole
-# activation, while on_attach caps scripts at 300s — which would kill a
-# foreground multiplexer under the developer. That layer runs from
-# PROMPT_COMMAND (see [vars]). Ordering is right by construction: project
-# hooks run before loadout hooks, so webapp's setup-dev.sh has already started
-# the dev servers, and the sandbox-dashboard loadout (listed before this one
-# in default_loadouts) has started the :4320 dashboard that `tailscale serve`
-# maps alongside them.
-# `|| true`: tailnet exposure is a nicety; it must never fail activation.
-# timeout: the script's internal waits are all bounded (daemon poll 10s +
-# `up` 30s + 2×20s serve) — 120 covers the worst case with slack, where the
-# 60s default would not. A runtime-killed on_activate fails the activation,
-# which the inner `|| true` cannot absorb.
-[[lifecycle_hooks]]
-description = "Join tailnet and expose dev servers by name (no-op without TS_AUTHKEY)"
-on_activate = { type = "inline", value = "bash ~/.local/bin/sandbox-tailnet-up.sh up || true", timeout = 120 }
-
+# No lifecycle hooks: this loadout is entirely interactive-layer, and that
+# layer (gh device-code login, the foreground zellij takeover) CANNOT live in
+# a lifecycle hook — on_activate has no terminal and a failing on_activate
+# fails the whole activation, while on_attach caps scripts at 300s, which
+# would kill a foreground multiplexer under the developer. It runs from
+# PROMPT_COMMAND instead (see [vars]).
 [vars]
 # webapp's PROMPT_COMMAND seam is gone as of gominimal/webapp#606 (project
 # setup now runs natively from its [[session.lifecycle_hooks]] on min 0.5.2),

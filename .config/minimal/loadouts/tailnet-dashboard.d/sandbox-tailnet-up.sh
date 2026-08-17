@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Join the running Minimal sandbox to the Tailscale tailnet as a userspace
-# node named `sandbox`, then expose the dev servers by name via
-# `tailscale serve`. Reach them from any tailnet device at
-# http://sandbox:4321 (main) / http://sandbox:4320 (dashboard).
+# node named `sandbox`. This script only JOINS and records the settled node
+# name — exposing ports by name (`tailscale serve`) is owned by the sandbox
+# dashboard's reconcile loop (tailnet-serve.ts, patched in beside the
+# dashboard), which discovers live dev servers and serves them as they
+# appear, in whatever order the hooks ran.
 # Concurrent sessions: control dedupes the machine name (sandbox-1, -2, …);
-# the settled name is recorded in <repo>/.tailscale/node-name and used for
-# the serve registration and the dashboard's rendered URLs.
+# the settled name is recorded in <repo>/.tailscale/node-name and read by the
+# dashboard for its rendered URLs.
 #
 # The Minimal sandbox is fully unprivileged (uid 1000, no sudo, no
 # /dev/net/tun), so tailscaled MUST run in userspace-networking mode and
@@ -28,7 +30,7 @@
 # The script no-ops (exit 0) when the key is absent so a keyless sandbox
 # still boots.
 #
-# Usage: scripts/sandbox-tailnet-up.sh [up|status|down]   (default: up)
+# Usage: sandbox-tailnet-up.sh [up|status|down]   (default: up)
 set -euo pipefail
 
 # The project directory — where .env.local (TS_AUTHKEY) and the .tailscale
@@ -48,12 +50,10 @@ REPO_ROOT="${SANDBOX_TAILNET_REPO_ROOT:-$PWD}"
 # pref once leaked into every session. Use a directory (--statedir), NOT a
 # single --state file: the file form errors with "no var root".
 STATE_DIR="$REPO_ROOT/.tailscale"
-# Runtime control socket, recreated on each sandbox boot. Must match
-# TS_SOCK in scripts/dev.sh so the worktree launcher targets the same daemon.
+# Runtime control socket, recreated on each sandbox boot. Must match TS_SOCK
+# in the dashboard's tailnet-serve.ts so the serve reconciler targets the
+# same daemon.
 SOCK="/tmp/ts/tailscaled.sock"
-
-# Dev-server ports exposed by name. 4320 = discovery dashboard, 4321 = main.
-SERVE_PORTS=(4320 4321)
 
 ts() { tailscale --socket="$SOCK" "$@"; }
 
@@ -115,19 +115,6 @@ ensure_daemon() {
   done
   echo "Error: tailscaled socket did not become ready (see /tmp/ts/tailscaled.log)." >&2
   return 1
-}
-
-# Expose one localhost port by name over HTTP (NOT https — https needs the
-# tailnet cert feature and hangs). Idempotent; guarded by a timeout so a
-# transient serve hang can't block dev startup.
-serve_port() {
-  local port="$1"
-  # Not `timeout 20 ts serve`: timeout can't exec the ts() shell function (127).
-  if timeout 20 tailscale --socket="$SOCK" serve --bg --http="$port" "localhost:$port" >/dev/null 2>&1; then
-    echo "Serving :$port → http://${NODE_NAME:-sandbox}:$port" >&2
-  else
-    echo "Note: 'tailscale serve' for :$port failed or timed out (non-fatal)." >&2
-  fi
 }
 
 # Authenticate this tailscaled to the tailnet. NOT idempotent with an OAuth
@@ -202,11 +189,12 @@ cmd_up() {
   fi
 
   # Control dedupes the requested hostname when several sessions are on the
-  # tailnet at once (sandbox, sandbox-1, …), and `serve` pins its vhost to the
-  # node's self-view at registration time — serving before the deduped name
-  # arrives in the netmap 404s every request addressed to the real name. Wait
-  # for the name to settle, and record it for other consumers (the sandbox
-  # dashboard renders its per-port tailnet URLs from the node-name file).
+  # tailnet at once (sandbox, sandbox-1, …), and `tailscale serve` (issued by
+  # the dashboard's reconciler) pins its vhost to the node's self-view at
+  # registration time — serving before the deduped name arrives in the netmap
+  # 404s every request addressed to the real name. Wait for the name to
+  # settle, and record it for other consumers (the sandbox dashboard renders
+  # its per-port tailnet URLs from the node-name file).
   NODE_NAME=""
   for _ in $(seq 1 20); do
     NODE_NAME=$(tailscale --socket="$SOCK" status --peers=false 2>/dev/null |
@@ -220,17 +208,11 @@ cmd_up() {
   fi
   printf '%s\n' "$NODE_NAME" >"$STATE_DIR/node-name"
   echo "Tailnet node '$NODE_NAME' up (userspace, web-serve only — no SSH)." >&2
-
-  for port in "${SERVE_PORTS[@]}"; do
-    serve_port "$port"
-  done
+  echo "Port exposure is reconciled by the sandbox dashboard (tailnet-serve.ts)." >&2
 }
 
 cmd_status() {
   ts status || true
-  for port in "${SERVE_PORTS[@]}"; do
-    echo "http://sandbox:$port"
-  done
 }
 
 cmd_down() {

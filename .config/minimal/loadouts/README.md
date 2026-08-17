@@ -5,13 +5,13 @@ Loadouts stack as peers per activation; these four are designed to be
 combined, and `../config.toml` applies three of them by default:
 
 ```toml
-default_loadouts = ["sandbox-dashboard", "dev", "agent-claude"]
+default_loadouts = ["tailnet-dashboard", "dev", "agent-claude"]
 ```
 
 | Loadout | Carries |
 | --- | --- |
-| `sandbox-dashboard` | The `:4320` discovery dashboard ([code + docs](./sandbox-dashboard.d/README.md)): patches the runtime files into the session, starts the server on activation |
-| `dev` | The agent-agnostic personal layer: vim/zellij/fzf, dotfiles, gh credential wiring, userspace tailnet (`dev.d/`), and the attach-time session hook |
+| `tailnet-dashboard` | Sandbox networking + discovery ([code + docs](./tailnet-dashboard.d/README.md)): userspace tailnet join and the `:4320` discovery dashboard, whose reconcile loop `tailscale serve`s every healthy dev-server port |
+| `dev` | The agent-agnostic personal layer: vim/zellij/fzf, dotfiles, gh credential wiring, and the attach-time session hook |
 | `agent-claude` | Claude Code as the session's coding agent: package, prefs + skills patches, onboarding seed |
 | `agent-pi` | [Pi](https://pi.dev) as the coding agent instead |
 
@@ -28,16 +28,16 @@ rather than by convention.
 Swap agents without editing config (`--loadout` ignores the defaults list):
 
 ```sh
-min activate --loadout sandbox-dashboard --loadout dev --loadout agent-pi
+min activate --loadout tailnet-dashboard --loadout dev --loadout agent-pi
 ```
 
 ## Ordering
 
-`sandbox-dashboard` must precede `dev` wherever both apply: hooks concatenate
-in loadout order, and dev's tailnet hook runs `tailscale serve` over a fixed
-port list that includes the dashboard's `:4320` — the listener has to exist
-by then. Project hooks always run before loadout hooks, so the project's dev
-servers are already up when either fires.
+Not load-bearing. The tailnet join and the port exposure both live in
+`tailnet-dashboard`, and exposure is a reconcile loop in the dashboard that
+catches up whenever the join lands — so loadouts can be listed in any order.
+(Project hooks always run before loadout hooks, so the project's dev servers
+are up before any of this fires.)
 
 ## Adopting these
 
@@ -47,7 +47,8 @@ They're personal — fork and adjust:
   keep files at real paths (no symlinks) or set `follow_symlinks = true`.
 - Credentials travel through the environment, never through patched files:
   `GH_TOKEN` (dev), `CLAUDE_CODE_OAUTH_TOKEN` (agent-claude), provider API
-  keys (agent-pi), `TS_AUTHKEY` (tailnet). Each loadout documents its own.
+  keys (agent-pi), `TS_AUTHKEY` (tailnet-dashboard; a project `.env.local`
+  fallback also works). Each loadout documents its own.
 - The dashboard's project-facing knobs (`SANDBOX_DASHBOARD_ASSIGNEE`,
   `SANDBOX_DASHBOARD_HEALTH_PATH`, `SANDBOX_DASHBOARD_START_HINT`) are set
-  from `sandbox-dashboard.toml` `[vars]` — see its README.
+  from `tailnet-dashboard.toml` `[vars]` — see its README.

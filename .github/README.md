@@ -13,10 +13,10 @@ Paths mirror `$HOME` (this is a bare-repo dotfiles setup, see below):
 
 | Path | What |
 | --- | --- |
-| `.config/minimal/config.toml` | `default_loadouts` (order matters) + client settings |
+| `.config/minimal/config.toml` | `default_loadouts` + client settings |
 | `.config/minimal/user_policy.toml` | Per-project lifecycle-hook allow-list |
 | `.config/minimal/loadouts/` | The loadouts — see [its README](../.config/minimal/loadouts/README.md) |
-| `.config/minimal/loadouts/sandbox-dashboard.d/` | In-sandbox discovery dashboard (server + tests) — see [its README](../.config/minimal/loadouts/sandbox-dashboard.d/README.md) |
+| `.config/minimal/loadouts/tailnet-dashboard.d/` | Userspace tailnet + in-sandbox discovery dashboard (scripts, server, tests) — see [its README](../.config/minimal/loadouts/tailnet-dashboard.d/README.md) |
 | `.claude/skills/` | Project-agnostic Claude Code skills, patched into sessions by the `agent-claude` loadout |
 | `.claude/settings.json` | Claude Code preferences (model, effort) |
 | `.vimrc`, `.config/zellij/config.kdl` | Editor + multiplexer config the `dev` loadout patches in |
@@ -44,9 +44,11 @@ The pieces most worth stealing:
 
 - **The loadout split** (`.config/minimal/loadouts/README.md`): agent-agnostic
   `dev` + one loadout per coding agent, selected via the `DEV_AGENT_CMD` var.
-- **The sandbox dashboard**: works with any web project that writes the
-  documented pidfiles and serves a health endpoint — not Astro-specific. Its
-  README covers integration knobs (`SANDBOX_DASHBOARD_*`).
+- **The tailnet-dashboard loadout**: a userspace tailnet join plus a
+  discovery dashboard that `tailscale serve`s every healthy dev-server port
+  it finds. Works with any web project that writes the documented pidfiles
+  and serves a health endpoint — not Astro-specific. Its README covers
+  integration knobs (`SANDBOX_DASHBOARD_*`).
 
 Secrets never live here: tokens travel through the environment
 (`GH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `TS_AUTHKEY`) or stay in gitignored

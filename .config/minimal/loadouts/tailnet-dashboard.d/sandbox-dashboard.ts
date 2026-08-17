@@ -2,7 +2,7 @@
 //
 // Extracted from gominimal/webapp (scripts/sandbox-dashboard.ts +
 // src/lib/dashboard/): it is personal tooling, patched into sessions by the
-// sandbox-dashboard loadout and run against whatever project checkout is the
+// tailnet-dashboard loadout and run against whatever project checkout is the
 // working directory — see repoRoot(). No npm dependencies on purpose: a
 // patched-in bare file has no node_modules to resolve packages from.
 //
@@ -13,7 +13,8 @@
 // proxy. So this is discovery only: each server is reachable two ways, and the
 // dashboard hands out a clickable link for each:
 //   - Tailnet (anywhere): http://sandbox:<port> — exposed via `tailscale serve`
-//     (the dev loadout's tailnet hook, a sibling of this loadout), resolved by
+//     (this loadout's own tailnet join + tailnet-serve.ts reconciler),
+//     resolved by
 //     MagicDNS, relay-bound.
 //   - Direct (fast, same network): http://<vm-ip>:<port> — the sandbox's
 //     192.168.64.x VM-bridge IPv4. Requires the Mac subnet router (the
@@ -57,6 +58,7 @@ import {
   discoverAssignedIssues,
   writeAssignedIssuesState,
 } from "./discover.ts";
+import { ensureServed } from "./tailnet-serve.ts";
 import {
   discoverTunnels,
   isCloudflaredInstalled,
@@ -115,7 +117,7 @@ const REFRESH_MS = 4000;
 // the webapp's launcher; other projects override via the loadout's [vars].
 const START_HINT = process.env.SANDBOX_DASHBOARD_START_HINT ?? "pnpm dev:start";
 
-// MagicDNS name for the in-sandbox tailnet node. The developer loadout's
+// MagicDNS name for the in-sandbox tailnet node. This loadout's
 // tailnet hook requests `sandbox`, but Tailscale dedupes the machine name
 // (sandbox-1, sandbox-2, …) when several sessions are on the tailnet at
 // once, so the hook records the settled name in `.tailscale/node-name`
@@ -147,8 +149,8 @@ function tailnetHost(): string {
 // as a Tailscale subnet route from the Mac. An address is reachable over the
 // "Direct" link ONLY if it falls inside this route — that advertisement is the
 // entire mechanism by which a tailnet client reaches the sandbox off-tailnet.
-// Keep in sync with VM_SUBNET in the dev loadout's host-side setup script
-// (dev.d/host/setup-sandbox-tailnet.sh).
+// Keep in sync with VM_SUBNET in the loadout's host-side setup script
+// (host/setup-sandbox-tailnet.sh, sibling of this file).
 const DIRECT_SUBNET_PREFIX = "192.168.64.";
 
 /**
@@ -874,6 +876,12 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   res.end(`Not found: ${escapeHtml(rawUrl)}`);
 }
 
+// Cadence of the tailnet-serve reconcile loop. Independent of the page's
+// REFRESH_MS poll on purpose: exposure must not depend on someone having the
+// dashboard open in a browser. Each pass runs a discovery (git worktree list
+// + pidfile scan + health probes) — about the cost of one open dashboard tab.
+const RECONCILE_TAILNET_MS = 10_000;
+
 function main(): void {
   const port = Number.parseInt(process.env.SANDBOX_DASHBOARD_PORT ?? "", 10) || DEFAULT_PORT;
   const server = createServer((req, res) => {
@@ -888,6 +896,20 @@ function main(): void {
   server.listen(port, () => {
     console.log(`[dashboard] listening on http://0.0.0.0:${port}`);
   });
+  // Expose the dashboard's own port and every healthy dev-server port by name
+  // over the tailnet (see tailnet-serve.ts). Runs immediately and then on a
+  // loop, skipping silently until the tailnet join lands — so neither hook
+  // ordering nor a late-arriving TS_AUTHKEY matters.
+  const reconcileTailnet = async (): Promise<void> => {
+    try {
+      const live = (await discover(repoRoot())).map((w) => w.port);
+      await ensureServed([port, ...live]);
+    } catch (err) {
+      console.warn("[dashboard] tailnet serve reconcile failed:", err);
+    }
+  };
+  void reconcileTailnet();
+  setInterval(reconcileTailnet, RECONCILE_TAILNET_MS);
   const shutdown = (sig: NodeJS.Signals): void => {
     console.log(`[dashboard] ${sig} received, shutting down`);
     server.close(() => process.exit(0));

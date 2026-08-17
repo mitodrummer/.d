@@ -1,0 +1,72 @@
+name        = "tailnet-dashboard"
+description = "kg: userspace tailnet + in-sandbox discovery dashboard on :4320 (join, name-based exposure, worktree dev servers, shares, assigned issues)"
+
+# Two cooperating components, bundled because each is what makes the other
+# useful (code + docs in tailnet-dashboard.d/, see its README):
+#
+#   - the userspace tailnet: sandbox-tailnet-up.sh JOINS the tailnet as an
+#     ephemeral node named `sandbox` and records the settled MagicDNS name in
+#     <repo>/.tailscale/node-name. It no-ops without TS_AUTHKEY (env, or the
+#     project's .env.local).
+#   - the discovery dashboard: lists every running worktree dev server of the
+#     project in cwd, and — as the one component that knows which ports are
+#     live — reconciles `tailscale serve` for its own port and every healthy
+#     dev-server port (tailnet-serve.ts). The reconcile loop skips silently
+#     until the join lands, so nothing here depends on hook or loadout
+#     ordering.
+#
+# Each half degrades independently: no TS_AUTHKEY → local-only dashboard;
+# dashboard stopped → tailnet node still up (nothing served).
+#
+# The project side only honors the discovery contract (pidfiles +
+# /healthcheck + strictPort + tailnet-hostname allowedHosts) — no tailnet or
+# dashboard code lives in a project repo.
+
+# node-lts runs the TS server (node ≥22.18 strips types natively); git + gh
+# feed worktree/PR/issue discovery; cloudflared backs the opt-in public Share
+# action; tailscale provides tailscaled + the CLI for the userspace node.
+# All dedupe against whatever the project session already provides.
+packages = ["node-lts", "git", "gh", "cloudflared", "tailscale"]
+
+# One dest per file, not a glob or source list: tailnet-dashboard.d/ also
+# carries tests, package.json, and node_modules that must never be patched
+# into a session, and multiple sources aimed at one dest directory are a
+# same-dest merge conflict at composition time.
+#
+# The tailnet script lands in ~/.local/bin (not lib/) because the dev
+# loadout's minimal-session-hook re-runs it from there as its --no-hooks
+# fallback; keeping the historical dest means that hook needs no coupling to
+# this loadout's layout.
+patches = [
+    { dest = ".local/lib/sandbox-dashboard/dashboard.sh", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/dashboard.sh" },
+    { dest = ".local/lib/sandbox-dashboard/sandbox-dashboard.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/sandbox-dashboard.ts" },
+    { dest = ".local/lib/sandbox-dashboard/discover.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/discover.ts" },
+    { dest = ".local/lib/sandbox-dashboard/tunnels.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/tunnels.ts" },
+    { dest = ".local/lib/sandbox-dashboard/tailnet-serve.ts", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/tailnet-serve.ts" },
+    { dest = ".local/bin/sandbox-tailnet-up.sh", source = "~/.config/minimal/loadouts/tailnet-dashboard.d/sandbox-tailnet-up.sh" },
+]
+
+# Dashboard first so its listener exists ASAP; the tailnet join follows. The
+# order is comfort, not correctness — the serve reconciler catches up
+# whenever the join lands. Both run with cwd = project root: the dashboard
+# anchors discovery on it, the tailnet script finds .env.local (TS_AUTHKEY
+# fallback) and the .tailscale state dir under it. `|| true` on both: they
+# are niceties and must never fail activation.
+[[lifecycle_hooks]]
+description = "Start the sandbox discovery dashboard on :4320"
+on_activate = { type = "inline", value = "bash ~/.local/lib/sandbox-dashboard/dashboard.sh start || true" }
+
+# timeout: the script's internal waits are all bounded (daemon poll 10s +
+# `up` 30s + name settle 10s) — 120 covers the worst case with slack, where
+# the 60s default would not. A runtime-killed on_activate fails the
+# activation, which the inner `|| true` cannot absorb.
+[[lifecycle_hooks]]
+description = "Join tailnet as ephemeral node `sandbox` (no-op without TS_AUTHKEY)"
+on_activate = { type = "inline", value = "bash ~/.local/bin/sandbox-tailnet-up.sh up || true", timeout = 120 }
+
+# Project-facing dashboard knobs (defaults match gominimal/webapp; see
+# tailnet-dashboard.d/README.md). Uncomment and adjust for other projects:
+#[vars]
+#SANDBOX_DASHBOARD_HEALTH_PATH = "/healthz"
+#SANDBOX_DASHBOARD_ASSIGNEE = ""            # empty disables the issues section
+#SANDBOX_DASHBOARD_START_HINT = "make dev"

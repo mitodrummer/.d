@@ -1,13 +1,16 @@
 ---
 name: sandbox-dashboard
-description: Integrate a project with the in-sandbox discovery dashboard (:4320) or triage why a dev server isn't showing on it. Use when wiring a new project's dev launcher into dashboard discovery, when a running server is missing from the dashboard, when a row shows a dead link, or when configuring SANDBOX_DASHBOARD_* vars in the sandbox-dashboard loadout.
+description: Integrate a project with the in-sandbox discovery dashboard (:4320) or triage why a dev server isn't showing on it. Use when wiring a new project's dev launcher into dashboard discovery, when a running server is missing from the dashboard, when a row shows a dead tailnet link, or when configuring SANDBOX_DASHBOARD_* / TS_AUTHKEY vars in the tailnet-dashboard loadout.
 ---
 
 The sandbox dashboard is a single HTTP server per sandbox (default `:4320`,
-served by the `sandbox-dashboard` loadout from
+run by the `tailnet-dashboard` loadout from
 `~/.local/lib/sandbox-dashboard/`) that lists every running dev server across
-the git worktrees of the project in its working directory. It is
-framework-agnostic: discovery is a contract, not an integration.
+the git worktrees of the project in its working directory, and reconciles
+`tailscale serve` for its own port plus every healthy dev-server port on a
+10s loop (the loadout also owns the tailnet join itself, via
+`~/.local/bin/sandbox-tailnet-up.sh`). It is framework-agnostic: discovery is
+a contract, not an integration.
 
 ## Wiring a project into discovery
 
@@ -64,12 +67,18 @@ path prefix.
 
 ## Dead or missing tailnet links
 
-Row exists but `http://sandbox:<port>` fails: the tailnet serve step maps a
-fixed port list before worktree servers register theirs — re-run
-`bash ~/.local/bin/sandbox-tailnet-up.sh` (idempotent) after starting new
-servers, and trust the settled node name in `<repo-root>/.tailscale/node-name`
-over the literal `sandbox` (MagicDNS dedupes to `sandbox-1`, … under
-concurrent sessions).
+Row exists but `http://sandbox:<port>` fails:
+
+- A newly started server is tailnet-served by the dashboard's reconcile loop
+  within ~10s of first passing the health gate — brief lag is normal.
+- Trust the settled node name in `<repo-root>/.tailscale/node-name` over the
+  literal `sandbox` (MagicDNS dedupes to `sandbox-1`, … under concurrent
+  sessions).
+- No name resolves at all → the join itself hasn't happened: run
+  `bash ~/.local/bin/sandbox-tailnet-up.sh` (idempotent; no-ops without
+  `TS_AUTHKEY` in the env or the project's `.env.local`).
+- The dashboard serves ports only while it is running — check
+  `dashboard.sh status` before suspecting the tailnet.
 
 ## Public shares (cloudflared)
 

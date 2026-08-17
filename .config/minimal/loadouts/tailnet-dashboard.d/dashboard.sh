@@ -5,12 +5,12 @@
 # muscle memory works the same.
 #
 # Personal tooling: this launcher and the server it starts are patched into
-# the session by the sandbox-dashboard loadout, not shipped by any project.
+# the session by the tailnet-dashboard loadout, not shipped by any project.
 # `start` MUST run with the project checkout as the working directory — the
 # server anchors discovery (git worktree list, .tailscale/node-name) on its
 # cwd. The loadout's on_activate hook satisfies this (hooks run from the
 # project root); so does the re-attach fallback in the dev loadout's
-# minimal-session-hook.
+# minimal-session-hook (a sibling loadout).
 #
 # Logs + pidfile live under ${TMPDIR:-/tmp} (minimal-dashboard.{log,pid}):
 # nothing personal is written into the project tree, and the project dir is
