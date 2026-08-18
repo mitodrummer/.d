@@ -30,7 +30,8 @@
 //   GET  /manifest.json  → { worktrees: WorktreeRow[],
 //                            assignedIssues: AssignedIssue[],
 //                            newAssignedIssueNumbers: number[],
-//                            directHost, cloudflaredAvailable: boolean,
+//                            directHost: string | null, tailnetHost: string,
+//                            cloudflaredAvailable: boolean,
 //                            orphanTunnels: TunnelInfo[] }
 //                          (used by the dashboard JS; each worktree entry's
 //                          `"port"` maps to http://sandbox:<port> and
@@ -71,7 +72,7 @@ import {
  * A discovered dev server plus its optional public-share state.
  *
  * SECURITY: `tunnelUrl` is a public, UNAUTHENTICATED entry point to the dev
- * server (see src/lib/dashboard/tunnels.ts). It is only ever present when an
+ * server (see tunnels.ts). It is only ever present when an
  * operator explicitly clicked "Share"; the UI flags it in red as PUBLIC.
  */
 interface WorktreeRow extends DiscoveredWorktree {
@@ -128,8 +129,8 @@ const START_HINT = process.env.SANDBOX_DASHBOARD_START_HINT ?? "pnpm dev:start";
 const TAILNET_HOST_FALLBACK = "sandbox";
 
 // Test hook: point tailnetHost() at a fixture node-name file so tests don't
-// depend on whether the checkout has a live tailnet. null restores the
-// default `<repo-root>/.tailscale/node-name`.
+// depend on whether the session has a live tailnet. null restores the
+// default `$HOME/.tailscale/node-name`.
 let nodeNameFileOverride: string | null = null;
 export function _setNodeNameFile(path: string | null): void {
   nodeNameFileOverride = path;
@@ -189,10 +190,11 @@ function primaryIpv4(): string | null {
 
 /**
  * The project checkout to discover — the directory `git worktree list` runs
- * from and `.tailscale/node-name` is read under. This file is patched into
- * the session rather than living in any repo, so the anchor is the working
- * directory: dashboard.sh is invoked from the project root by the loadout's
- * on_activate hook, and node inherits that cwd.
+ * from and discovered dev-server cwds are matched against. This file is
+ * patched into the session rather than living in any repo, so the anchor is
+ * the working directory: dashboard.sh is invoked from the project root by the
+ * loadout's on_activate hook, and node inherits that cwd. (The node-name file
+ * is NOT read from here — it lives under `$HOME`, see {@link tailnetHost}.)
  */
 function repoRoot(): string {
   return resolve(process.cwd());

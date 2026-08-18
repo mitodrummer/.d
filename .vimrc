@@ -201,10 +201,10 @@ augroup END
 
 " Sort Tailwind classes in saved .astro files. CI does not run this — biome's
 " useSortedClasses rule does not yet autofix HTML class="..." attributes — so
-" we route the saved file through scripts/sort-classes.mjs and let `autoread`
+" we route the saved file through scripts/sort-classes.ts and let `autoread`
 " pull the rewritten content back into the buffer.
 function! s:SortClassesOnSave() abort
-  let l:script = findfile('scripts/sort-classes.mjs', '.;')
+  let l:script = findfile('scripts/sort-classes.ts', '.;')
   if empty(l:script) | return | endif
   call system('node ' . shellescape(l:script) . ' ' . shellescape(expand('%:p')))
   silent! checktime

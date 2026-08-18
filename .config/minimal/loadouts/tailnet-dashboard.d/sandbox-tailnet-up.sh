@@ -12,8 +12,9 @@
 # The Minimal sandbox is fully unprivileged (uid 1000, no sudo, no
 # /dev/net/tun), so tailscaled MUST run in userspace-networking mode and
 # Tailscale SSH is impossible (it needs root) — this is web-serve only.
-# The statedir under the project dir is SCRATCH, not persistence: nothing in a
-# session survives its destruction, so each session registers a fresh node.
+# The statedir (under the session $HOME, see STATE_DIR) is SCRATCH, not
+# persistence: nothing in a session survives its destruction, so each session
+# registers a fresh node.
 # That is why TS_AUTHKEY must be an EPHEMERAL key — the node deregisters itself
 # when the session ends, instead of leaving a dead `sandbox` behind every time.
 #

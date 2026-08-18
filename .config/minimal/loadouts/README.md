@@ -45,10 +45,13 @@ They're personal — fork and adjust:
 
 - Patch `source` paths point at this checkout's real locations (`~/.config/...`);
   keep files at real paths (no symlinks) or set `follow_symlinks = true`.
-- Credentials travel through the environment, never through patched files:
+- Credentials travel through the environment, not through this checkout:
   `GH_TOKEN` (dev), `CLAUDE_CODE_OAUTH_TOKEN` (agent-claude), provider API
-  keys (agent-pi), `TS_AUTHKEY` (tailnet-dashboard; a project `.env.local`
-  fallback also works). Each loadout documents its own.
+  keys (agent-pi). The one exception is the tailnet key, which
+  `tailnet-dashboard` patches in from `~/.config/minimal/secrets/ts-authkey`
+  — a gitignored host path, so no project has to carry `TS_AUTHKEY` in its
+  own files (env and a project `.env.local` still work as fallbacks). Each
+  loadout documents its own.
 - The dashboard's project-facing knobs (`SANDBOX_DASHBOARD_ASSIGNEE`,
   `SANDBOX_DASHBOARD_HEALTH_PATH`, `SANDBOX_DASHBOARD_START_HINT`) are set
   from `tailnet-dashboard.toml` `[vars]` — see its README.

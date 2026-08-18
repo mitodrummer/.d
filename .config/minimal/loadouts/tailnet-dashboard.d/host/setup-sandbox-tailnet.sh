@@ -9,18 +9,18 @@
 # relay-bound and slower for chatty dev traffic (HMR, large bundles).
 #
 # Run this ON THE MAC (the host), not in the sandbox. It lives in host/ for
-# exactly that reason: the loadout patches dev.d/*.sh into the session, and
-# that glob is single-level, so nothing here is copied into the sandbox where
-# a macOS-only script could only fail confusingly. The macOS VM bridge hands
+# exactly that reason: the loadout names each patched file individually, and
+# nothing under host/ is on that list, so a macOS-only script can never land in
+# the sandbox where it could only fail confusingly. The macOS VM bridge hands
 # every sandbox an address in a stable `192.168.64.0/24`, so the route never
 # changes across sandbox rebuilds — that's why a single advertised /24 covers
 # every sandbox and there's no per-rebuild IP discovery.
 #
 # Usage:
-#   ~/.config/minimal/loadouts/dev.d/host/setup-sandbox-tailnet.sh            # advertise the VM subnet route
-#   ~/.config/minimal/loadouts/dev.d/host/setup-sandbox-tailnet.sh set        # same as default
-#   ~/.config/minimal/loadouts/dev.d/host/setup-sandbox-tailnet.sh remove     # stop advertising it
-#   ~/.config/minimal/loadouts/dev.d/host/setup-sandbox-tailnet.sh status     # print advertised routes
+#   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh          # advertise the VM subnet route
+#   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh set      # same as default
+#   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh remove   # stop advertising it
+#   ~/.config/minimal/loadouts/tailnet-dashboard.d/host/setup-sandbox-tailnet.sh status   # print advertised routes
 set -euo pipefail
 
 # macOS VM bridge subnet (stable /24 — see header). Every sandbox lands here.

@@ -29,7 +29,7 @@ export type CommandExistsFn = (cmd: string) => Promise<boolean>;
  * a live but unrelated process. That misread is harmful in both directions — it
  * makes startTunnel hand back a ghost tunnel instead of spawning a real one, and
  * it makes stopTunnel SIGTERM/SIGKILL a stranger. Mirrors the identity check in
- * scripts/dashboard.sh (`is_dashboard_pid`) and src/lib/dashboard/discover.ts.
+ * dashboard.sh (`is_dashboard_pid`) and discover.ts.
  *
  * Matching on the binary name alone is NOT sufficient: a recycled PID can land
  * on a *different* cloudflared (another port's tunnel, or one started by hand),
@@ -81,7 +81,7 @@ const TUNNEL_PIDFILE_RE = /^minimal-tunnel-(\d+)\.pid$/;
 // Match the first such URL in the captured log.
 const TRYCLOUDFLARE_URL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
-// Same bounds and rationale as src/lib/dashboard/discover.ts: a corrupt pidfile
+// Same bounds and rationale as discover.ts: a corrupt pidfile
 // could carry an out-of-range port (a dead link) or a non-positive / absurd PID
 // (`kill -0 0` probes the process group, not a real process — a ghost "alive"
 // row). Bound both before trusting them.
@@ -251,7 +251,7 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 /**
  * Read a PID's argv from `/proc` (Linux — the sandbox and CI), falling back to
  * `ps` for a macOS operator running the dashboard directly on the host. Mirrors
- * scripts/dashboard.sh's `pid_cmdline`.
+ * dashboard.sh's `pid_cmdline`.
  */
 async function pidCmdline(pid: number): Promise<string | null> {
   try {

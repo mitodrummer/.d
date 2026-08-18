@@ -551,7 +551,9 @@ export interface DiscoverAssignedIssuesOptions {
  * List open GitHub issues assigned to {@link ASSIGNED_ISSUES_LOGIN}.
  *
  * Runs `gh issue list --assignee <login> --state open --json number,title,url`
- * through the injectable `exec`, validates the JSON with Zod, and caches the
+ * through the injectable `exec`, validates the JSON with the hand-rolled
+ * fail-closed guards above (no schema library in a patched-in bare file, see
+ * {@link isAssignedIssue}), and caches the
  * result for {@link ASSIGNED_ISSUES_CACHE_TTL_MS} (keyed by assignee) so the
  * dashboard's auto-refresh loop doesn't hammer `gh`. On any `gh` failure or
  * malformed output it logs a warning and returns an empty list — the section

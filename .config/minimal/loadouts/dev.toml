@@ -23,7 +23,11 @@ packages = ["vim", "zellij", "fzf"]
 patches = [
     { dest = ".gitconfig", source = "~/.gitconfig" },
     { dest = ".vimrc", source = "~/.vimrc" },
-    { dest = ".config/zellij", source = "~/.config/zellij" },
+    # Glob, not the bare directory: a literal source is matched as a file path,
+    # so a directory source enumerates nothing and the patch silently copies
+    # ZERO files (no warning — quieter than a missing source). `**/*.kdl` also
+    # keeps zellij's own `config.kdl.bak` out of the session.
+    { dest = ".config/zellij/", source = "~/.config/zellij/**/*.kdl" },
 
     # gcloud Application Default Credentials. UNLIKE gh and claude, this one is
     # a real file rather than a Keychain leftover: `gcloud auth

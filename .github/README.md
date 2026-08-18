@@ -14,7 +14,6 @@ Paths mirror `$HOME` (this is a bare-repo dotfiles setup, see below):
 | Path | What |
 | --- | --- |
 | `.config/minimal/config.toml` | `default_loadouts` + client settings |
-| `.config/minimal/user_policy.toml` | Per-project lifecycle-hook allow-list |
 | `.config/minimal/loadouts/` | The loadouts — see [its README](../.config/minimal/loadouts/README.md) |
 | `.config/minimal/loadouts/tailnet-dashboard.d/` | Userspace tailnet + in-sandbox discovery dashboard (scripts, server, tests) — see [its README](../.config/minimal/loadouts/tailnet-dashboard.d/README.md) |
 | `.claude/skills/` | Project-agnostic Claude Code skills, patched into sessions by the `agent-claude` loadout |
@@ -51,8 +50,10 @@ The pieces most worth stealing:
   integration knobs (`SANDBOX_DASHBOARD_*`).
 
 Secrets never live here: tokens travel through the environment
-(`GH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `TS_AUTHKEY`) or stay in gitignored
-`.env.local` files, and the loadouts document that contract inline.
+(`GH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`), stay in gitignored `.env.local`
+files, or — for the tailnet key — sit in gitignored
+`~/.config/minimal/secrets/` and are patched into the session from there.
+The loadouts document that contract inline.
 
 ## Roadmap
 

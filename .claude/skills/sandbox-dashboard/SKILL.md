@@ -58,7 +58,8 @@ root — a dashboard started elsewhere discovers nothing.
 
 Everything the page shows is JSON at `GET /manifest.json` (shape:
 `{ worktrees: DiscoveredWorktree[], assignedIssues: AssignedIssue[],
-directHost: string | null, tailnetHost, cloudflaredAvailable, orphanTunnels }`).
+newAssignedIssueNumbers: number[], directHost: string | null, tailnetHost,
+cloudflaredAvailable, orphanTunnels }`).
 Only `worktrees` entries carry a `port`; build each server's two URLs as
 `http://<tailnetHost>:<port>` (works anywhere) and, when `directHost` is
 non-null, `http://<directHost>:<port>` (fast, same network). The page itself
@@ -129,8 +130,9 @@ Row exists but `http://sandbox:<port>` fails:
   over the literal `sandbox` (MagicDNS dedupes to `sandbox-1`, … under
   concurrent sessions).
 - No name resolves at all → the join itself hasn't happened: run
-  `bash ~/.local/bin/sandbox-tailnet-up.sh` (idempotent; no-ops without
-  `TS_AUTHKEY` in the env or the project's `.env.local`).
+  `bash ~/.local/bin/sandbox-tailnet-up.sh` (idempotent; no-ops when it finds
+  no key in `~/.config/sandbox-tailnet/authkey`, `TS_AUTHKEY`, or the
+  project's `.env.local`).
 - The dashboard serves ports only while it is running — check
   `dashboard.sh status` before suspecting the tailnet.
 
