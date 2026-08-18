@@ -31,7 +31,7 @@ The orchestrator chooses a descriptive kebab-case base name (derived from requir
 | Plan | `plans/{base-name}.plan.md` |
 | Review | `plans/{base-name}.plan.review.md` |
 
-Both files live in the `plans/` folder at the workspace root. The shared base name keeps plan/review pairs unique when multiple RALPH loops run in parallel.
+Both files live in the `plans/` folder at the workspace root. The shared base name keeps plan/review pairs unique when multiple RALPH loops run in parallel. For an existing plan given by path, keep the pair together: write the review beside the plan (`{plan-dir}/{base-name}.plan.review.md`), not into `plans/`.
 
 ## Review-update cycle limit
 
@@ -53,7 +53,7 @@ You (the parent agent) are the **orchestrator**. You NEVER write plan content yo
 
 Every agent that creates or updates the plan MUST maintain an `## Open Questions` section immediately after the YAML frontmatter (before any other content). When something is ambiguous, unclear, or requires a human decision, add it here as a numbered list item.
 
-Reviewers MUST ignore the `## Open Questions` section entirely — it is not reviewable content. It exists so the human user can address ambiguities after the loop completes.
+Reviewers MUST NOT review the content of `## Open Questions` — it is not reviewable content. They MUST still read it, and MUST NOT raise an issue that is already parked there: a question the updater could not resolve without the human is deferred, not outstanding. Re-filing it every cycle is what keeps the loop from ever reporting clean.
 
 ---
 

@@ -98,7 +98,7 @@ Environment variables, typically set from the loadout's `[vars]`:
 | `SANDBOX_DASHBOARD_HEALTH_PATH` | `/healthcheck` | Liveness path probed on each discovered port |
 | `SANDBOX_DASHBOARD_ASSIGNEE` | unset | GitHub login for the assigned-issues section; unset or empty disables the section and its `gh` calls. The code carries no default login — `../tailnet-dashboard.toml` sets `agent-137` |
 | `SANDBOX_DASHBOARD_START_HINT` | `pnpm dev:start` | Command shown in the empty state |
-| `TS_AUTHKEY` | unset | Tailnet join key override (normally the patched key file is used); nothing available → local-only |
+| `TS_AUTHKEY` | unset | Tailnet join key, used only when the patched key file is absent or empty; nothing available → local-only |
 | `DEV_EXTRA_ALLOWED_HOSTS` | set by this loadout | Hostnames the project's dev server should admit (generic seam, see above) |
 
 ## Development

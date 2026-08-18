@@ -84,8 +84,14 @@ fi
 
 # Numbers referenced by an existing local branch or worktree (branch name
 # contains the issue number, e.g. `feat/123-foo` or `issue-123`).
+#
+# `--porcelain` filtered to the worktree/branch lines, NOT plain `git worktree
+# list`: that form prints the abbreviated HEAD sha next to each path, and a sha
+# is mostly hex digits — `e928e8cc` matches the `[^0-9]8[^0-9]` probe below, so
+# every low-numbered issue read as "already being worked" and was silently
+# dropped from the prompt.
 branch_blob="$(git branch --format='%(refname:short)' 2>/dev/null || true)"
-worktree_blob="$(git worktree list 2>/dev/null || true)"
+worktree_blob="$(git worktree list --porcelain 2>/dev/null | grep -E '^(worktree|branch) ' || true)"
 
 is_worked() {
   local num="$1"

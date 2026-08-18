@@ -248,7 +248,7 @@ function renderShareCellHtml(row: WorktreeRow, cloudflaredAvailable: boolean): s
     );
   }
   if (!cloudflaredAvailable) {
-    return `<button type="button" class="btn" disabled title="Run 'min add cloudflared' to enable public sharing">Share</button> <span class="tag">needs <code>min add cloudflared</code></span>`;
+    return `<button type="button" class="btn" disabled title="Add cloudflared to the tailnet-dashboard loadout's packages, then re-activate the session">Share</button> <span class="tag">needs <code>cloudflared</code></span>`;
   }
   return `<button type="button" class="btn" data-share="${row.port}">Share</button>`;
 }
@@ -456,7 +456,7 @@ function shareCellHtml(r, cloudflaredAvailable) {
       + '<button type="button" class="btn" data-stop="' + r.port + '">Stop sharing</button>';
   }
   if (!cloudflaredAvailable) {
-    return '<button type="button" class="btn" disabled title="Run \\'min add cloudflared\\' to enable public sharing">Share</button> <span class="tag">needs <code>min add cloudflared</code></span>';
+    return '<button type="button" class="btn" disabled title="Add cloudflared to the tailnet-dashboard loadout\\'s packages, then re-activate the session">Share</button> <span class="tag">needs <code>cloudflared</code></span>';
   }
   return '<button type="button" class="btn" data-share="' + r.port + '">Share</button>';
 }
@@ -821,7 +821,8 @@ async function handleTunnelAction(
       case "not-installed":
         sendJson(res, 503, {
           ok: false,
-          message: "cloudflared is not installed — run 'min add cloudflared'",
+          message:
+            "cloudflared is not installed — add it to the tailnet-dashboard loadout's packages and re-activate the session",
         });
         return;
       case "spawn-failed":

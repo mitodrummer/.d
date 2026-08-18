@@ -126,9 +126,17 @@ command! -nargs=? RgFzf call <SID>FzfRun(
       \ . shellescape(empty(<q-args>) ? '' : <q-args>),
       \ function('<SID>OpenGrepHit'))
 
-command! Buffers call <SID>FzfRun(
-      \ 'vim -e -c "ls" -c "q" 2>&1 | sed -n "s/^[^0-9]*\([0-9]\+\).*/\1 &/p"',
-      \ function('<SID>OpenBuffer'))
+" The buffer list has to be captured from THIS Vim: a `vim -e -c "ls"`
+" subprocess lists its own (empty) buffers, so the old shell pipeline handed
+" fzf nothing and `:Buffers` could never open anything. Dump `:ls` to a
+" tempfile — Vim wipes its temp dir on exit — and let fzf read that.
+function! s:BuffersFzf() abort
+  let l:list = tempname()
+  call writefile(split(execute('ls'), "\n"), l:list)
+  call s:FzfRun('cat ' . shellescape(l:list), function('<SID>OpenBuffer'))
+endfunction
+
+command! Buffers call <SID>BuffersFzf()
 
 nnoremap <C-p> :Files<CR>
 nnoremap <leader>p :Files<CR>

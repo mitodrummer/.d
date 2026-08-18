@@ -118,10 +118,13 @@ fi
 # its own subvolume every time, so without this it greets every `min session activate`
 # and lands on top of the layout.
 #
-# Generated from `zellij setup --dump-config` rather than pinned here: the
-# output is by definition valid for whatever zellij the session actually has,
-# so a catalog version bump can't leave a stale config behind. Only written
-# when missing, so hand edits survive re-attaches.
+# Normally the file is already there: dev.toml patches the host's pinned
+# ~/.config/zellij/*.kdl in, and this block is skipped. It is the fallback for
+# a host that has no zellij config to patch — generated with
+# `zellij setup --dump-config` rather than pinned here, so the output is by
+# definition valid for whatever zellij the session actually has and a catalog
+# version bump can't leave a stale config behind. Only written when missing, so
+# both the patched copy and later hand edits survive re-attaches.
 # --------------------------------------------------------------------------
 command -v zellij >/dev/null 2>&1 || {
   echo "zellij not installed; skipping layout." >&2

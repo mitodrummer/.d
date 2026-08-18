@@ -57,10 +57,13 @@ root — a dashboard started elsewhere discovers nothing.
 ## Agent surface: `/manifest.json`
 
 Everything the page shows is JSON at `GET /manifest.json` (shape:
-`{ worktrees: DiscoveredWorktree[], assignedIssues: AssignedIssue[],
+`{ worktrees: WorktreeRow[], assignedIssues: AssignedIssue[],
 newAssignedIssueNumbers: number[], directHost: string | null, tailnetHost,
-cloudflaredAvailable, orphanTunnels }`).
-Only `worktrees` entries carry a `port`; build each server's two URLs as
+cloudflaredAvailable, orphanTunnels: TunnelInfo[] }`). A `WorktreeRow` is a
+discovered dev server plus, when a public share is active, `tunnelUrl`
+(resolved) or `tunnelPending: true` (URL still negotiating); `orphanTunnels`
+carry the same `port`/`url` shape for shares whose dev server has since
+stopped. Build each server's two URLs as
 `http://<tailnetHost>:<port>` (works anywhere) and, when `directHost` is
 non-null, `http://<directHost>:<port>` (fast, same network). The page itself
 is discovery-only — it never proxies or rewrites URLs, because dev servers'

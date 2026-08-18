@@ -3,8 +3,9 @@ name: worktree-orchestration
 description: >-
   The worktree-per-issue orchestration playbook: fan GitHub issues assigned
   to agent-137 out to parallel background subagents, each owning a
-  .worktrees/ git worktree + dev server end-to-end (implement -> converge
-  locally -> push once -> PR -> /shipit -> merge gate -> cleanup). Use when
+  .worktrees/ git worktree + dev server from implement -> converge locally
+  -> push once -> PR -> /shipit -> merge gate, where it stops; the
+  orchestrator garbage-collects the worktree after merge. Use when
   dispatching or working assigned issues, when the assigned-issues hook
   surfaces unclaimed work, or when garbage-collecting a merged worktree.
   Project-side mechanics (ports, pidfiles, healthcheck, E2E_PORT, vulndb

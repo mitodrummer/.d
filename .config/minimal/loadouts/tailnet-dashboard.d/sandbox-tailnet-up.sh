@@ -66,12 +66,16 @@ ts() { tailscale --socket="$SOCK" "$@"; }
 # blanket `source`, which would pull every secret into this shell) and NEVER
 # print the value.
 load_authkey_from_env_file() {
-  [ -n "${TS_AUTHKEY:-}" ] && return 0
+  # File FIRST, then the environment — the order every doc states, and the
+  # reason the loadout patches the key to a path of its own: a stale exported
+  # TS_AUTHKEY (inherited shell, another project's .env) must not shadow the
+  # key the operator provisioned host-side.
   if [ -f "$AUTHKEY_FILE" ]; then
     TS_AUTHKEY="$(head -1 "$AUTHKEY_FILE" | tr -d '[:space:]')"
     export TS_AUTHKEY
     [ -n "$TS_AUTHKEY" ] && return 0
   fi
+  [ -n "${TS_AUTHKEY:-}" ] && return 0
   local env_file="$REPO_ROOT/.env.local"
   [ -f "$env_file" ] || return 0
   # Strip the key= prefix, then a trailing ` # inline comment` (auth keys never
@@ -86,8 +90,13 @@ load_authkey_from_env_file() {
 
 ensure_installed() {
   command -v tailscaled >/dev/null 2>&1 && return 0
-  echo "tailscaled not found on PATH; installing via 'min add tailscale'..." >&2
-  min add tailscale
+  # No auto-install: `min add` requires a placement flag and would edit the
+  # PROJECT's minimal.toml, while `tailscale` is declared by this loadout's own
+  # `packages` — a missing binary means the loadout did not apply, which no
+  # in-session command can repair.
+  echo "Error: tailscaled not on PATH. The tailnet-dashboard loadout declares the" >&2
+  echo "'tailscale' package; re-activate the session with that loadout applied." >&2
+  return 1
 }
 
 # Start tailscaled in userspace mode if it isn't already running, then poll the

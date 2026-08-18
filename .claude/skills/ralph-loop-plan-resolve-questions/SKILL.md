@@ -58,8 +58,7 @@ below. Then, if the answer materially changes the plan's approach:
 
 Only if the user **explicitly** requested a follow-up review loop:
 
-1. Read the `ralph-loop-plan-review` skill (or `ralph-loop-plan-review-local`
-   if available in `.claude/skills/`).
+1. Read the `ralph-loop-plan-review` skill.
 2. Follow that skill's instructions, entering at Phase 2 (Review) with the
    updated plan as the existing document.
 3. The review cycle limit defaults to **2** for post-resolution loops (lighter

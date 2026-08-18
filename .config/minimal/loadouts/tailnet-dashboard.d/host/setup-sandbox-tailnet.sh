@@ -94,12 +94,14 @@ cmd_status() {
     echo "Error: jq not found — needed to read advertised routes ('brew install jq')." >&2
     return 1
   }
-  echo "Advertised routes for this Mac:"
-  # AllowedIPs lists the routes this node advertises (plus its own /32s); an
-  # empty field is non-fatal — the message below still informs.
+  # AllowedIPs carries the routes control has APPROVED for this node (plus its
+  # own /32s), not everything it advertises — so right after `set`, and before
+  # the admin-console approval, this correctly prints only the /32s. An empty
+  # field is non-fatal; the message below still informs.
+  echo "Approved routes for this Mac (only /32s until the subnet route is approved):"
   "$ts" status --json 2>/dev/null \
     | jq -r '.Self.AllowedIPs // [] | .[]' \
-    || echo "(could not read advertised routes; is tailscaled running?)"
+    || echo "(could not read routes; is tailscaled running?)"
 }
 
 case "${1:-set}" in
