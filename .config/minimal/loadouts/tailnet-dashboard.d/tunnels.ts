@@ -444,7 +444,7 @@ function defaultKill(pid: number, signal: NodeJS.Signals | 0): void {
 /**
  * Whether the cloudflared binary is resolvable on PATH. The dashboard uses this
  * to decide up front whether to offer the "Share" action or show the
- * `min add cloudflared` hint, rather than only discovering it's missing on the
+ * add-it-to-the-loadout hint, rather than only discovering it's missing on the
  * first click.
  */
 export async function isCloudflaredInstalled(
@@ -526,7 +526,7 @@ const inFlightStarts = new Map<number, Promise<StartTunnelResult>>();
  * Idempotent: if a live tunnel already exists for the port, its current info is
  * returned rather than spawning a second cloudflared. Returns `not-installed`
  * (without spawning) when cloudflared isn't on PATH so the caller can show the
- * `min add cloudflared` hint and degrade gracefully.
+ * add-it-to-the-loadout hint and degrade gracefully.
  *
  * Concurrency-safe: overlapping calls for the same port share one in-flight
  * start (see {@link inFlightStarts}) so a double-submit can't spawn — and orphan

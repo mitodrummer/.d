@@ -69,13 +69,20 @@ load_authkey_from_env_file() {
   # File FIRST, then the environment — the order every doc states, and the
   # reason the loadout patches the key to a path of its own: a stale exported
   # TS_AUTHKEY (inherited shell, another project's .env) must not shadow the
-  # key the operator provisioned host-side.
+  # key the operator provisioned host-side. Stash the inherited value before
+  # reading the file: an EMPTY key file would otherwise overwrite it with "",
+  # turning a working env key into no key at all.
+  local from_env="${TS_AUTHKEY:-}"
   if [ -f "$AUTHKEY_FILE" ]; then
     TS_AUTHKEY="$(head -1 "$AUTHKEY_FILE" | tr -d '[:space:]')"
     export TS_AUTHKEY
     [ -n "$TS_AUTHKEY" ] && return 0
   fi
-  [ -n "${TS_AUTHKEY:-}" ] && return 0
+  if [ -n "$from_env" ]; then
+    TS_AUTHKEY="$from_env"
+    export TS_AUTHKEY
+    return 0
+  fi
   local env_file="$REPO_ROOT/.env.local"
   [ -f "$env_file" ] || return 0
   # Strip the key= prefix, then a trailing ` # inline comment` (auth keys never

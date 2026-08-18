@@ -64,7 +64,8 @@ set wildignore+=*.log,*.lock
 let mapleader = " "
 
 " ── Ctrl-P: live fuzzy file open (fzf + fd) ──────────────────────────
-" Requires fzf + fd on PATH (installed via `min add fzf fd`).
+" Requires fzf + fd on PATH (fzf ships with the dev loadout's packages; fd and
+" rg come from the project's own session packages).
 " Opens an interactive fzf in a bottom split; results filter as you type.
 function! s:FzfRun(source_cmd, sink) abort
   let l:tmp = tempname()

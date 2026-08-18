@@ -138,7 +138,7 @@ if [ ! -f "$zj_config" ]; then
 fi
 
 # A prior `dev` session is deliberately NOT force-deleted. The sandbox outlives
-# each `min attach`, and this hook re-runs on a second attach — tearing the
+# each `min session attach`, and this hook re-runs on a second attach — tearing the
 # layout down would kill panes still being worked in. `attach --create` rejoins
 # a live session and creates one when there is none. For a clean layout, run
 # `zellij delete-session --force dev` by hand first.
