@@ -2,3 +2,5 @@
 - [No decision-trail comments](no-decision-trail-comments.md) — debated-in-review is a signal NOT to comment it; rationale lives in PR history
 - [Memory persistence via .d](memory-persistence-via-dotd.md) — sandbox memory is ephemeral; PR memory files to mitodrummer/.d
 - [Rerun reuses stale merge ref](rerun-reuses-stale-merge-ref.md) — after a main-side fix, update-branch instead of gh run rerun
+- [main branch protection unreadable](main-branch-protection-unreadable.md) — never rename a CI job name; required checks key off it and admin cannot be read
+- [Tailnet rename serve rebuild](tailnet-rename-serve-rebuild.md) — node rename 404s served ports; serve reset + dashboard restart
