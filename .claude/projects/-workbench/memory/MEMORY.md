@@ -1,3 +1,4 @@
 - [CodeRabbit rate-limit false pass](coderabbit-rate-limit-false-pass.md) — green check ≠ reviewed; verify a review exists on head
 - [No decision-trail comments](no-decision-trail-comments.md) — debated-in-review is a signal NOT to comment it; rationale lives in PR history
 - [Memory persistence via .d](memory-persistence-via-dotd.md) — sandbox memory is ephemeral; PR memory files to mitodrummer/.d
+- [Rerun reuses stale merge ref](rerun-reuses-stale-merge-ref.md) — after a main-side fix, update-branch instead of gh run rerun
